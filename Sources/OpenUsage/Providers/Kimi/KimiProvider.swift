@@ -14,17 +14,20 @@ final class KimiProvider: ProviderRuntime {
 
     let authStore: KimiAuthStore
     let usageClient: KimiUsageClient
+    let openCodeUsageScanner: OpenCodeKimiUsageScanner
     let pricing: @Sendable () async -> ModelPricing
     let now: @Sendable () -> Date
 
     init(
         authStore: KimiAuthStore = KimiAuthStore(),
         usageClient: KimiUsageClient = KimiUsageClient(),
+        openCodeUsageScanner: OpenCodeKimiUsageScanner = OpenCodeKimiUsageScanner(),
         pricing: @escaping @Sendable () async -> ModelPricing = { await ModelPricingStore.shared.current() },
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.authStore = authStore
         self.usageClient = usageClient
+        self.openCodeUsageScanner = openCodeUsageScanner
         self.pricing = pricing
         self.now = now
     }
@@ -76,16 +79,22 @@ final class KimiProvider: ProviderRuntime {
             return ProviderSnapshot.error(provider: provider, error: KimiUsageError.connectionFailed)
         }
     }
-    /// Fold Kimi usage that happened inside pi into the card: Usage Trend plus the Today / Yesterday /
-    /// Last 30 Days spend tiles, scanned from pi's session logs (the only local harness that logs Kimi
-    /// traffic in a known format) and priced through the shared engine. No pi logs → no local rows.
+    /// Fold Kimi usage that happened inside pi and OpenCode into the card: Usage Trend plus the
+    /// Today / Yesterday / Last 30 Days spend tiles, scanned from local harness logs and priced through
+    /// the shared engine (pi carries authoritative per-message costs; OpenCode BYO-key rows record $0
+    /// and get priced). No local logs → no local rows.
     private func snapshotWithLocalUsage(mapped: (plan: String?, lines: [MetricLine])) async -> ProviderSnapshot {
         var lines = mapped.lines
         var usageHistory: ProviderUsageHistory?
         let pricing = await pricing()
-        let piScan = await PiUsageScanner.shared.scan(cardID: provider.id, now: now(), pricing: pricing)
-        if !Task.isCancelled, let scan = piScan {
-            let note = "From your pi logs (estimated)"
+        async let pi = PiUsageScanner.shared.scan(cardID: provider.id, now: now(), pricing: pricing)
+        async let openCode = openCodeUsageScanner.scan(now: now(), pricing: pricing)
+        let (piScan, openCodeScan) = await (pi, openCode)
+        if !Task.isCancelled, let scan = DailyUsageAccumulator.merged([piScan, openCodeScan]) {
+            var sources: [String] = []
+            if piScan != nil { sources.append("pi") }
+            if openCodeScan != nil { sources.append("OpenCode") }
+            let note = "From your \(sources.joined(separator: " and ")) logs (estimated)"
             usageHistory = ProviderUsageHistory(
                 series: scan.series,
                 modelUsage: scan.modelUsage,

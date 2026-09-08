@@ -27,7 +27,10 @@ actor PiUsageScanner {
 
     private static let sharedScanner = IncrementalJSONLScanner<Entry>(
         logTag: LogTag.plugin("pi"),
-        persistence: JSONLScanCachePersistence(namespace: "pi", schemaVersion: 1)
+        // v2: parse output depends on PiProviderMapping's table (unmapped providers are dropped at
+        // parse time, before caching). Adding `kimi-coding` invalidated every entry cached by builds
+        // without it — bumping the schema forces one full re-parse.
+        persistence: JSONLScanCachePersistence(namespace: "pi", schemaVersion: 2)
     )
 
     static func flushPersistentCacheWrites() async {

@@ -27,6 +27,18 @@ One required endpoint: `GET https://api.kimi.com/coding/v1/usages` (Bearer auth)
   fails the meters still render, just without a plan label. Do not use `usages.user.membership.level`
   (`LEVEL_STANDARD`) — that enum is the coding product version, not the subscription tier.
 
+## Local harness usage
+
+Beyond the live quota, the card folds in Kimi traffic from local harness logs:
+
+- **pi** — `~/.pi/agent/sessions` JSONL; pi records an authoritative per-message cost, used as-is.
+- **OpenCode** — BYO-key `kimi-for-coding` provider rows in OpenCode's database; those record $0, so
+  tokens are priced through the shared pricing engine (`k3` → `kimi-k3` rates, `kimi-for-coding` →
+  `kimi-k2.7-code`). OpenCode-hosted kimi models (`kimi-k2.5-free` etc.) bill to OpenCode and are
+  excluded on purpose.
+
+These drive the Usage Trend row and the Today / Yesterday / Last 30 Days spend tiles.
+
 ## Errors
 
 - **No key** — set `KIMI_API_KEY` or save the key in Settings.
