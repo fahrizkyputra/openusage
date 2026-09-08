@@ -158,3 +158,81 @@ final class TotalSpendAggregatorTests: XCTestCase {
         XCTAssertTrue(total.projection(for: .costPerMtok).isEmpty)
     }
 }
+
+/// Series-backed windows (7/14/60/180/365 days): only providers with daily `usageHistory`
+/// contribute, and the window cutoffs are calendar-exact.
+final class TotalSpendSeriesAggregatorTests: XCTestCase {
+    private let kimi = Provider(id: "kimi", displayName: "Kimi", icon: .providerMark("kimi"))
+    private let openrouter = Provider(id: "openrouter", displayName: "OpenRouter", icon: .providerMark("openrouter"))
+
+    private let now = OpenUsageISO8601.date(from: "2026-09-09T12:00:00.000Z")!
+
+    private func historySnapshot(_ provider: Provider, daily: [DailyUsageEntry]) -> ProviderSnapshot {
+        ProviderSnapshot(
+            providerID: provider.id,
+            displayName: provider.displayName,
+            lines: [],
+            refreshedAt: now,
+            usageHistory: ProviderUsageHistory(series: DailyUsageSeries(daily: daily))
+        )
+    }
+
+    private func dayEntry(_ day: String, usd: Double, tokens: Int) -> DailyUsageEntry {
+        DailyUsageEntry(date: day, totalTokens: tokens, costUSD: usd)
+    }
+
+    private var snapshots: [String: ProviderSnapshot] {
+        [
+            "kimi": historySnapshot(kimi, daily: [
+                dayEntry("2026-09-09", usd: 10, tokens: 1000),   // today
+                dayEntry("2026-09-03", usd: 20, tokens: 2000),   // 6 days ago
+                dayEntry("2026-08-28", usd: 40, tokens: 4000),   // 12 days ago
+                dayEntry("2026-08-11", usd: 80, tokens: 8000),   // 29 days ago
+                dayEntry("2026-07-12", usd: 160, tokens: 16000), // 59 days ago
+                dayEntry("2026-03-13", usd: 320, tokens: 32000), // ~180 days ago
+                dayEntry("2025-09-10", usd: 640, tokens: 64000)  // ~1 year ago
+            ]),
+            // API-period provider with a classic spend line but no daily history.
+            "openrouter": ProviderSnapshot(
+                providerID: openrouter.id,
+                displayName: openrouter.displayName,
+                lines: [.values(label: "Today", values: [MetricValue(number: 5, kind: .dollars, estimated: false)])],
+                refreshedAt: now
+            )
+        ]
+    }
+
+    private func usd(for period: TotalSpendPeriod) -> Double {
+        TotalSpendAggregator.total(for: period, providers: [kimi, openrouter], snapshots: snapshots, now: now).totalUSD
+    }
+
+    func testTodayKeepsLineBackedProviders() {
+        XCTAssertEqual(usd(for: .today), 5, accuracy: 0.0001)
+    }
+
+    func testLast7DaysIncludesTodayAndSixDaysBack() {
+        XCTAssertEqual(usd(for: .last7), 30, accuracy: 0.0001)
+    }
+
+    func testLast14Days() {
+        XCTAssertEqual(usd(for: .last14), 70, accuracy: 0.0001)
+    }
+
+    func testLast60Days() {
+        XCTAssertEqual(usd(for: .last60), 310, accuracy: 0.0001)
+    }
+
+    func testLast6MonthsExcludesDay181() {
+        // 2026-03-13 is exactly 181 days before 2026-09-09 — outside the 180-day window.
+        XCTAssertEqual(usd(for: .last180), 310, accuracy: 0.0001)
+    }
+
+    func testLastYearIncludesEverything() {
+        XCTAssertEqual(usd(for: .last365), 1270, accuracy: 0.0001)
+    }
+
+    func testSeriesSlicesAreMarkedEstimated() {
+        let total = TotalSpendAggregator.total(for: .last14, providers: [kimi], snapshots: snapshots, now: now)
+        XCTAssertTrue(total.isEstimated)
+    }
+}

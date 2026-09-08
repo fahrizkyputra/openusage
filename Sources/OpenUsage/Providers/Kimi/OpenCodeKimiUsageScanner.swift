@@ -25,7 +25,7 @@ struct OpenCodeKimiUsageScanner: Sendable {
 
     /// Best-effort supplementary scan: failures are logged loudly but never hide Kimi's live quota
     /// meters or pi history. Returns nil when there is no OpenCode database at all.
-    func scan(now: Date, daysBack: Int = 30, pricing: ModelPricing) async -> LogUsageScan? {
+    func scan(now: Date, daysBack: Int = 365, pricing: ModelPricing) async -> LogUsageScan? {
         let paths: [String]
         do {
             paths = try databasePaths()

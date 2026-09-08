@@ -59,7 +59,7 @@ actor AntigravityDbUsageScanner {
             .map { geminiHome.trimmingTrailingSlashes + "/" + $0 + "/conversations" }
     }
 
-    func scan(daysBack: Int = 30, now: Date = Date(), pricing: ModelPricing) async -> LogUsageScan? {
+    func scan(daysBack: Int = 365, now: Date = Date(), pricing: ModelPricing) async -> LogUsageScan? {
         var failingPaths: [String: String] = [:]
         var directories: [String] = []
         do {

@@ -12,7 +12,6 @@ struct TotalSpendCard: View {
     @Environment(LayoutStore.self) private var layout
     @Environment(WidgetDataStore.self) private var dataStore
     @Environment(\.colorScheme) private var colorScheme
-    @Namespace private var pickerNamespace
 
     /// The selected period survives popover closes and relaunches, like the meter-style toggles.
     @AppStorage(TotalSpendSetting.periodKey) private var periodRawValue = TotalSpendPeriod.today.rawValue
@@ -148,44 +147,42 @@ struct TotalSpendCard: View {
         }
     }
 
-    /// A capsule segmented switcher in the app's own design language (the footer's glass capsule
-    /// controls), replacing the stock `.segmented` picker whose legacy rounded-rect chrome clashes
-    /// with the Tahoe look. The selected segment is a Liquid Glass capsule (frosted material on
-    /// macOS 15) that slides between segments via `matchedGeometryEffect`.
+    /// A capsule period dropdown in the app's own design language (the footer's glass capsule
+    /// controls). Eight windows don't fit a segmented row, so the picker is a menu showing the
+    /// selected window; the selection persists across popover closes and relaunches.
     private var periodPicker: some View {
-        HStack(spacing: 2) {
+        Menu {
             ForEach(TotalSpendPeriod.allCases) { candidate in
-                periodSegment(candidate)
+                Button {
+                    periodRawValue = candidate.rawValue
+                } label: {
+                    if candidate == period {
+                        Label(candidate.shortLabel, systemImage: "checkmark")
+                    } else {
+                        Text(candidate.shortLabel)
+                    }
+                }
             }
+        } label: {
+            HStack(spacing: 4) {
+                Text(period.shortLabel)
+                    .font(.system(size: 11, weight: .semibold))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .foregroundStyle(AnyShapeStyle(.primary))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity)
+            .contentShape(Capsule())
         }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
         .padding(3)
         .background(.quinary, in: Capsule())
         .frame(maxWidth: .infinity)
-    }
-
-    private func periodSegment(_ candidate: TotalSpendPeriod) -> some View {
-        let isSelected = candidate == period
-        return Button {
-            periodRawValue = candidate.rawValue
-        } label: {
-            Text(candidate.shortLabel)
-                .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
-                .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-                .frame(maxWidth: .infinity)
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .background {
-            if isSelected {
-                Capsule()
-                    .fill(.background)
-                    .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-                    .matchedGeometryEffect(id: "totalSpendPeriod", in: pickerNamespace)
-            }
-        }
-        .animation(Motion.spring, value: periodRawValue)
     }
 
     /// A metric/period combination with nothing to show mirrors the spend tiles' "No data" rule —

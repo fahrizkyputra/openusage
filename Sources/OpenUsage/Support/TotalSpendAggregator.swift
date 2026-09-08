@@ -1,27 +1,51 @@
 import Foundation
 
-/// The spend period the Total Spend card can show — matching the three per-provider spend tiles
-/// `SpendTileMapper` emits, whose line labels double as the lookup keys here.
+/// The spend period the Total Spend card can show. The three classic periods (Today / Yesterday /
+/// Last 30 Days) sum the per-provider spend-tile lines `SpendTileMapper` emits — including API-only
+/// providers like OpenRouter that carry no daily history. The longer windows bucket each provider's
+/// `usageHistory` daily series instead, so only log-scanning providers contribute to them.
 enum TotalSpendPeriod: String, CaseIterable, Identifiable, Sendable {
     case today = "Today"
     case yesterday = "Yesterday"
+    case last7 = "Last 7 Days"
+    case last14 = "Last 14 Days"
     case last30 = "Last 30 Days"
+    case last60 = "Last 60 Days"
+    case last180 = "Last 6 Months"
+    case last365 = "Last Year"
 
     var id: String { rawValue }
 
-    /// The metric-line label this period sums across providers (identical to the raw value today,
-    /// but kept as its own accessor so the two meanings can diverge without a hunt).
+    /// The metric-line label this period sums across providers for the classic line-backed periods
+    /// (identical to the raw value today, but kept as its own accessor so the two meanings can
+    /// diverge without a hunt).
     var lineLabel: String { rawValue }
 
-    /// Compact segment title for the period switcher — "Last 30 Days" doesn't fit three-across
-    /// in the 320pt popover without shrinking every segment.
-    var shortLabel: String {
+    /// Window length in calendar days, today included. `nil` for Today/Yesterday (single-day labels
+    /// with their own line backing).
+    var windowDays: Int? {
         switch self {
-        case .today: "Today"
-        case .yesterday: "Yesterday"
-        case .last30: "30 Days"
+        case .today, .yesterday: nil
+        case .last7: 7
+        case .last14: 14
+        case .last30: 30
+        case .last60: 60
+        case .last180: 180
+        case .last365: 365
         }
     }
+
+    /// Series-backed multi-day windows without their own spend-tile line. `last30` keeps the line
+    /// path so API-only providers (OpenRouter) still contribute to it.
+    var usesDailySeries: Bool {
+        switch self {
+        case .today, .yesterday, .last30: false
+        case .last7, .last14, .last60, .last180, .last365: true
+        }
+    }
+
+    /// Menu title (the picker is a dropdown, so there's no cramped segmented control to fit).
+    var shortLabel: String { rawValue }
 }
 
 /// Which quantity the Total Spend card's ring, center, and legend show. The title menu persists this
@@ -166,8 +190,12 @@ enum TotalSpendAggregator {
     static func total(
         for period: TotalSpendPeriod,
         providers: [Provider],
-        snapshots: [String: ProviderSnapshot]
+        snapshots: [String: ProviderSnapshot],
+        now: Date = Date()
     ) -> TotalSpend {
+        if period.usesDailySeries {
+            return seriesTotal(for: period, providers: providers, snapshots: snapshots, now: now)
+        }
         let slices = providers.compactMap { provider -> TotalSpendSlice? in
             guard let snapshot = snapshots[provider.id],
                   let line = snapshot.line(label: period.lineLabel),
@@ -186,6 +214,38 @@ enum TotalSpendAggregator {
                 tokenCount: max(tokens, 0),
                 estimated: dollars.contains(where: \.estimated)
             )
+        }
+        return TotalSpend(period: period, slices: slices)
+    }
+
+    /// Multi-day window totals from each provider's `usageHistory` daily series (log-scanned local
+    /// history). Only providers with deep history contribute — API-period-only providers (OpenRouter)
+    /// have no series and stay on the classic Today/Yesterday/30 Days periods. Every contributor's
+    /// dollars are locally priced, so slices are marked estimated.
+    private static func seriesTotal(
+        for period: TotalSpendPeriod,
+        providers: [Provider],
+        snapshots: [String: ProviderSnapshot],
+        now: Date
+    ) -> TotalSpend {
+        guard let days = period.windowDays else { return TotalSpend(period: period, slices: []) }
+        let calendar = Calendar.current
+        let start = calendar.date(byAdding: .day, value: -(days - 1), to: calendar.startOfDay(for: now)) ?? now
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.dateFormat = "yyyy-MM-dd"
+        let minDayKey = formatter.string(from: start)
+
+        let slices = providers.compactMap { provider -> TotalSpendSlice? in
+            guard let history = snapshots[provider.id]?.usageHistory else { return nil }
+            var amount = 0.0
+            var tokens = 0.0
+            for day in history.series.daily where day.date >= minDayKey {
+                amount += max(day.costUSD ?? 0, 0)
+                tokens += max(Double(day.totalTokens), 0)
+            }
+            guard amount > 0 || tokens > 0 else { return nil }
+            return TotalSpendSlice(provider: provider, amountUSD: amount, tokenCount: tokens, estimated: true)
         }
         return TotalSpend(period: period, slices: slices)
     }

@@ -65,7 +65,7 @@ actor PiUsageScanner {
     /// Scan the last `daysBack` days of pi logs for one card. Returns nil when pi's sessions directory
     /// has no log files at all, so a provider with no pi usage folds in nothing.
     func scan(
-        cardID: String, daysBack: Int = 30, now: Date = Date(), pricing: ModelPricing,
+        cardID: String, daysBack: Int = 365, now: Date = Date(), pricing: ModelPricing,
         estimateCost: CostEstimator? = nil
     ) async -> LogUsageScan? {
         let directory = PiPaths.sessionsDirectory(environment: environment, homeDirectory: homeDirectory())
