@@ -54,7 +54,12 @@ final class KimiProvider: ProviderRuntime {
             guard (200..<300).contains(response.statusCode) else {
                 return ProviderSnapshot.error(provider: provider, error: KimiUsageError.requestFailed(response.statusCode))
             }
-            let mapped = try KimiUsageMapper.map(body: response.body)
+            // Best-effort plan name: a failed /me call must not blank the quota meters.
+            var meBody: Data?
+            if let me = try? await usageClient.fetchMe(apiKey: auth.apiKey), (200..<300).contains(me.statusCode) {
+                meBody = me.body
+            }
+            let mapped = try KimiUsageMapper.map(body: response.body, meBody: meBody)
             return ProviderSnapshot.make(provider: provider, plan: mapped.plan, lines: mapped.lines, refreshedAt: now())
         } catch let error as KimiUsageError {
             return ProviderSnapshot.error(provider: provider, error: error)

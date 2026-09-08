@@ -4,13 +4,15 @@ import Foundation
 /// - top-level `usage` is the weekly request quota (used / limit, `resetTime`),
 /// - each `limits[]` entry is a rolling rate-limit window (`window.duration` + `window.timeUnit`);
 ///   a sub-daily window is the session meter, a multi-day window the weekly fallback,
-/// - `user.membership.level` (e.g. `LEVEL_STANDARD`) becomes the plan name.
+/// - `user.membership.level` (e.g. `LEVEL_STANDARD`) is a product enum, NOT the plan — the retail plan
+///   name comes from `/coding/v1/me`'s `user_level_name` (e.g. "Vivace"), passed in separately.
 ///
 /// All numeric fields arrive as strings (`"100"`); `ProviderParse.number` accepts both.
 enum KimiUsageMapper {
     static let weeklyPeriodMs = 7 * 24 * 60 * 60 * 1000
 
-    static func map(body: Data) throws -> (plan: String?, lines: [MetricLine]) {
+    static func map(body: Data, meBody: Data? = nil) throws -> (plan: String?, lines: [MetricLine]) {
+        let plan = meBody.flatMap(planName(fromMe:))
         guard let root = ProviderParse.jsonObject(body) else {
             throw KimiUsageError.invalidResponse
         }
@@ -38,23 +40,19 @@ enum KimiUsageMapper {
         }
 
         guard !lines.isEmpty else {
-            return (planName(from: root), [.noUsageData])
+            return (plan, [.noUsageData])
         }
-        return (planName(from: root), lines)
+        return (plan, lines)
     }
 
     // MARK: - Private
 
-    /// `LEVEL_STANDARD` → `Standard`; unknown levels pass through title-cased minus the prefix.
-    private static func planName(from root: [String: Any]) -> String? {
-        guard let user = root["user"] as? [String: Any],
-              let membership = user["membership"] as? [String: Any],
-              let level = (membership["level"] as? String)?.nilIfEmpty
-        else {
-            return nil
-        }
-        let trimmed = level.hasPrefix("LEVEL_") ? String(level.dropFirst("LEVEL_".count)) : level
-        return trimmed.lowercased().titleCased(separator: { $0 == "_" })
+    /// `/me` `user_level_name` ("Vivace") is the retail plan name. Deliberately not
+    /// `usages.user.membership.level`: that enum (LEVEL_STANDARD) is the coding product version, not the
+    /// subscription tier — a Vivace account reports LEVEL_STANDARD there.
+    private static func planName(fromMe body: Data) -> String? {
+        guard let root = ProviderParse.jsonObject(body) else { return nil }
+        return (root["user_level_name"] as? String)?.nilIfEmpty
     }
 
     /// A `limits[]` entry → `(periodMs, lineBuilder)`. The builder is deferred so the caller picks the
