@@ -49,7 +49,7 @@ final class PiUsageScannerTests: XCTestCase {
 
     func testParsesMappedAnthropicLine() {
         let entry = PiUsageScanner.parseLine(line())
-        XCTAssertEqual(entry?.cardID, "claude")
+        XCTAssertEqual(entry?.piProvider, "anthropic")
         XCTAssertEqual(entry?.model, "claude-opus-4-8")
         XCTAssertEqual(entry?.carriedCost, 0.5)
         XCTAssertEqual(entry?.reportedTotalTokens, 150)
@@ -63,9 +63,10 @@ final class PiUsageScannerTests: XCTestCase {
         XCTAssertEqual(entry?.tokens.cacheWrite5m, 600)
     }
 
-    func testMapsCodexAndSkipsUnmappedAndNonAssistant() {
-        XCTAssertEqual(PiUsageScanner.parseLine(line(provider: "openai-codex"))?.cardID, "codex")
-        XCTAssertNil(PiUsageScanner.parseLine(line(provider: "nvidia-nim")))
+    func testKeepsRawProviderAndSkipsOnlyNonAssistant() {
+        XCTAssertEqual(PiUsageScanner.parseLine(line(provider: "openai-codex"))?.piProvider, "openai-codex")
+        // Unmapped providers parse too — mapping happens at aggregation so the cache survives table edits.
+        XCTAssertEqual(PiUsageScanner.parseLine(line(provider: "nvidia-nim"))?.piProvider, "nvidia-nim")
         let userLine = Data(#"{"type":"message","timestamp":"2026-07-12T10:00:00.000Z","message":{"role":"user","provider":"anthropic","usage":{}}}"#.utf8)
         XCTAssertNil(PiUsageScanner.parseLine(userLine))
     }
