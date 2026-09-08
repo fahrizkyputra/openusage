@@ -16,9 +16,13 @@ final class KimiUsageMapperTests: XCTestCase {
     }
     """#
 
+    private let liveMe = #"""
+    {"user_id": "abc123", "nickname": "User", "region": "REGION_OVERSEA", "user_level": 30, "user_level_name": "Vivace"}
+    """#
+
     func testMapsLiveResponseToSessionAndWeeklyMeters() throws {
-        let (plan, lines) = try KimiUsageMapper.map(body: Data(liveUsages.utf8))
-        XCTAssertEqual(plan, "Standard")
+        let (plan, lines) = try KimiUsageMapper.map(body: Data(liveUsages.utf8), meBody: Data(liveMe.utf8))
+        XCTAssertEqual(plan, "Vivace")
         XCTAssertEqual(lines.count, 2)
 
         let session = lines[0]
@@ -51,6 +55,12 @@ final class KimiUsageMapperTests: XCTestCase {
         }
         XCTAssertEqual(used, 50, accuracy: 0.001)
         XCTAssertEqual(period, 5 * 60 * 60 * 1000)
+    }
+
+    func testWithoutMeBodyPlanIsNilButMetersStillMap() throws {
+        let (plan, lines) = try KimiUsageMapper.map(body: Data(liveUsages.utf8))
+        XCTAssertNil(plan)
+        XCTAssertEqual(lines.count, 2)
     }
 
     func testGarbageBodyThrows() {

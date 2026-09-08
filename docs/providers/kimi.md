@@ -17,14 +17,15 @@ A saved config file overrides the environment variable.
 
 ## What it tracks
 
-One endpoint: `GET https://api.kimi.com/coding/v1/usages` (Bearer auth).
+One required endpoint: `GET https://api.kimi.com/coding/v1/usages` (Bearer auth); plus the optional
+`GET https://api.kimi.com/coding/v1/me` for the plan name.
 
 - **Session** — the sub-daily rolling rate-limit window (`limits[]` entry, e.g. the 300-minute
   window), shown as percent used with the real reset time.
 - **Weekly** — the weekly request quota (top-level `usage`), percent used, resets at `resetTime`.
-- **Plan** — `user.membership.level` (e.g. `LEVEL_STANDARD` → "Standard"). Kimi exposes only this
-  internal enum, not the retail tier name (Andante/Moderato/Allegretto/Allegro); no endpoint returns
-  it, so the plan label stays at the API's wording.
+- **Plan** — `user_level_name` from `GET /coding/v1/me` (e.g. "Vivace"), best-effort: if that call
+  fails the meters still render, just without a plan label. Do not use `usages.user.membership.level`
+  (`LEVEL_STANDARD`) — that enum is the coding product version, not the subscription tier.
 
 ## Errors
 
