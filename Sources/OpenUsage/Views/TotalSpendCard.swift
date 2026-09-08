@@ -147,12 +147,51 @@ struct TotalSpendCard: View {
         }
     }
 
-    /// A capsule period dropdown in the app's own design language (the footer's glass capsule
-    /// controls). Eight windows don't fit a segmented row, so the picker is a menu showing the
-    /// selected window; the selection persists across popover closes and relaunches.
+    /// A capsule switcher in the app's own design language: two fixed segments (Today / Yesterday)
+    /// plus a third segment that is a dropdown for the multi-day windows (7 / 14 / 30 / 60 Days,
+    /// 6 Months, 1 Year — default 30 Days). The selection persists across popover closes and
+    /// relaunches.
     private var periodPicker: some View {
-        Menu {
-            ForEach(TotalSpendPeriod.allCases) { candidate in
+        HStack(spacing: 2) {
+            periodSegment(.today)
+            periodSegment(.yesterday)
+            rangeSegment
+        }
+        .padding(3)
+        .background(.quinary, in: Capsule())
+        .frame(maxWidth: .infinity)
+    }
+
+    private func periodSegment(_ candidate: TotalSpendPeriod) -> some View {
+        let isSelected = candidate == period
+        return Button {
+            periodRawValue = candidate.rawValue
+        } label: {
+            Text(candidate.shortLabel)
+                .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+                .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .frame(maxWidth: .infinity)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .background {
+            if isSelected {
+                Capsule()
+                    .fill(.background)
+                    .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+            }
+        }
+        .animation(Motion.spring, value: periodRawValue)
+    }
+
+    /// The third segment: a menu of multi-day windows. Shows the selected window's label and reads
+    /// selected whenever any multi-day window is active, so it doubles as the range display.
+    private var rangeSegment: some View {
+        let isSelected = period.usesDailySeries || period == .last30
+        return Menu {
+            ForEach(TotalSpendPeriod.allCases.filter(\.usesDailySeries)) { candidate in
                 Button {
                     periodRawValue = candidate.rawValue
                 } label: {
@@ -164,14 +203,13 @@ struct TotalSpendCard: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
-                Text(period.shortLabel)
-                    .font(.system(size: 11, weight: .semibold))
+            HStack(spacing: 3) {
+                Text(isSelected && period != .last30 ? period.shortLabel : TotalSpendPeriod.last30.shortLabel)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 7, weight: .bold))
             }
-            .foregroundStyle(AnyShapeStyle(.primary))
+            .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity)
@@ -180,9 +218,15 @@ struct TotalSpendCard: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .padding(3)
-        .background(.quinary, in: Capsule())
         .frame(maxWidth: .infinity)
+        .background {
+            if isSelected {
+                Capsule()
+                    .fill(.background)
+                    .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+            }
+        }
+        .animation(Motion.spring, value: periodRawValue)
     }
 
     /// A metric/period combination with nothing to show mirrors the spend tiles' "No data" rule —

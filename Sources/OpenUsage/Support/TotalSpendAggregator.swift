@@ -44,8 +44,20 @@ enum TotalSpendPeriod: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Menu title (the picker is a dropdown, so there's no cramped segmented control to fit).
-    var shortLabel: String { rawValue }
+    /// Compact segment/menu title — "Last 30 Days" doesn't fit the capsule without shrinking every
+    /// segment, so multi-day windows drop the "Last".
+    var shortLabel: String {
+        switch self {
+        case .today: "Today"
+        case .yesterday: "Yesterday"
+        case .last7: "7 Days"
+        case .last14: "14 Days"
+        case .last30: "30 Days"
+        case .last60: "60 Days"
+        case .last180: "6 Months"
+        case .last365: "1 Year"
+        }
+    }
 }
 
 /// Which quantity the Total Spend card's ring, center, and legend show. The title menu persists this
