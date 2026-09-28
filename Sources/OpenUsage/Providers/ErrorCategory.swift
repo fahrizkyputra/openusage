@@ -226,6 +226,26 @@ extension OpenRouterUsageError: CategorizedError {
     }
 }
 
+extension NineRouterAuthError: CategorizedError {
+    var errorCategory: ErrorCategory {
+        switch self {
+        case .notInstalled: .notLoggedIn
+        case .unreadable: .credentialAccess
+        case .invalidToken, .invalidBaseURL: .authInvalid
+        }
+    }
+}
+
+extension NineRouterUsageError: CategorizedError {
+    var errorCategory: ErrorCategory {
+        switch self {
+        case .notRunning: .network
+        case .invalidResponse: .decoding
+        case .requestFailed(let status): ErrorCategory.http(status)
+        }
+    }
+}
+
 extension ZAIAuthError: CategorizedError {
     var errorCategory: ErrorCategory {
         switch self {

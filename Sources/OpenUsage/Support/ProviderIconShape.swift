@@ -95,6 +95,7 @@ enum ProviderMarks {
 
     static func symbolFallback(for id: String) -> String {
         switch id {
+        case "9router": return "arrow.triangle.branch"
         case "antigravity": return "paperplane"
         case "claude": return "sparkle"
         case "codex": return "circle.hexagongrid"

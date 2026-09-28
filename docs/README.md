@@ -23,6 +23,7 @@ What the app does and how it behaves. These pages describe **behavior, not visua
 
 What each provider tracks, where its credentials come from, and what to do when it shows an error.
 
+- [9router](providers/9router.md)
 - [Antigravity](providers/antigravity.md)
 - [Claude](providers/claude.md)
 - [Codex](providers/codex.md)

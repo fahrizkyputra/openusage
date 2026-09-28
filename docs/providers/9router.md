@@ -1,0 +1,53 @@
+# 9router
+
+Tracks spend and plan limits of a local [9router](https://github.com/decolua/9router) gateway — the
+proxy that rotates your AI coding requests across several upstream accounts.
+
+## What it tracks
+
+| Metric | Meaning |
+|---|---|
+| Session | The tightest 5-hour window across every active upstream connection |
+| Weekly | The tightest weekly window across every active upstream connection |
+| Today | Cost and tokens routed through 9router today |
+| Last 7 Days | Cost and tokens over the last 7 days |
+| Last 30 Days | Cost and tokens over the last 30 days |
+
+9router spreads requests over several accounts, so Session and Weekly show the account closest to its
+limit — the one that will throttle you first. Model-specific windows and credit balances are left out.
+Connections that report no plan quota (plain API keys, custom endpoints) only count toward spend.
+
+Costs are the ones 9router records per request, not a local estimate.
+
+## Where credentials come from
+
+Nothing to set up. 9router's own CLI reaches the dashboard with a token derived from two files 9router
+writes the first time it starts:
+
+- `~/.9router/machine-id`
+- `~/.9router/auth/cli-secret`
+
+OpenUsage derives the same token from those files and only sends it to the local 9router server.
+
+Optional overrides (shell profile):
+
+- `NINEROUTER_DATA_DIR` — 9router data directory, if you start 9router with a custom `DATA_DIR`.
+- `NINEROUTER_URL` — server address, default `http://127.0.0.1:20128`.
+
+## Troubleshooting
+
+- **"9router not found"** — 9router has never run on this Mac. Start it once with `9router`.
+- **"Couldn't reach 9router"** — the server isn't running, or listens on another port (set `NINEROUTER_URL`).
+- **"9router rejected the local CLI token"** — the secret changed or the data directory doesn't match
+  the running server. Restart 9router, and check `NINEROUTER_DATA_DIR`.
+- **No Session / Weekly rows** — none of the active connections report a plan quota.
+
+## Under the hood
+
+`GET` calls against the local server, each with the `x-9r-cli-token` header:
+
+- `/api/usage/stats?period=today|7d|30d` — required; the spend rows come from `totalCost` and
+  prompt + completion tokens.
+- `/api/providers` — best-effort; the list of active connections.
+- `/api/usage/<connectionId>` — best-effort, once per active connection; its `session` and `weekly`
+  quotas feed the Session and Weekly meters. A failing connection is skipped.

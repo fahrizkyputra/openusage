@@ -22,6 +22,7 @@ Either way, the app updates itself in place via signed, notarized [Sparkle](docs
 
 ## Supported Providers
 
+- **[9router](docs/providers/9router.md)** — tightest session/weekly window across upstream accounts, daily/weekly/monthly spend (local gateway)
 - **[Antigravity](docs/providers/antigravity.md)** — shared Gemini and Claude pool quotas, 5-hour and weekly windows
 - **[Claude](docs/providers/claude.md)** — session, weekly, model-specific limits, extra usage, local daily spend
 - **[Codex](docs/providers/codex.md)** — session, weekly, credits, local daily spend
