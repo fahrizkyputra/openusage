@@ -14,7 +14,10 @@ proxy that rotates your AI coding requests across several upstream accounts.
 | Last 30 Days | Cost and tokens over the last 30 days |
 
 9router spreads requests over several accounts, so Session and Weekly show the account closest to its
-limit — the one that will throttle you first. Model-specific windows and credit balances are left out.
+limit — the one that will throttle you first — and name it beside the row title (e.g. "Weekly · Account 1").
+Each meter is picked on its own, so Session and Weekly can name different accounts. The name is the
+connection's label in the 9router dashboard; when two active connections share a label, the provider is
+added ("Account 1 (claude)"). Model-specific windows and credit balances are left out.
 Connections that report no plan quota (plain API keys, custom endpoints) only count toward spend.
 
 Costs are the ones 9router records per request, not a local estimate.

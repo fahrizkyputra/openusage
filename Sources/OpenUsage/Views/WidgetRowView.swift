@@ -122,6 +122,12 @@ struct WidgetRowView: View {
                 .font(labelFont)
                 .foregroundStyle(.primary)
                 .lineLimit(1)
+            if let source = data.sourceLabel {
+                Text("· \(source)")
+                    .font(supportingFont)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
             warning(state)
         }
     }

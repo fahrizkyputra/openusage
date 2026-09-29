@@ -16,11 +16,19 @@ enum NineRouterUsageMapper {
         case weekly
     }
 
+    /// One active upstream connection: its id and the name shown next to a meter it wins.
+    struct Connection: Equatable, Sendable {
+        var id: String
+        var name: String
+    }
+
     /// One bounded quota window reported for a connection.
     struct Quota: Equatable, Sendable {
         var window: Window
         var percent: Double
         var resetsAt: Date?
+        /// Display name of the connection that reported it (e.g. "Account 1").
+        var source: String? = nil
     }
 
     // MARK: - Stats
@@ -39,21 +47,34 @@ enum NineRouterUsageMapper {
 
     // MARK: - Connections
 
-    /// IDs of active connections from `/api/providers`, in 9router's order. Nil when the body is malformed.
-    static func activeConnectionIDs(_ body: Data) -> [String]? {
+    /// Active connections from `/api/providers`, in 9router's order. Nil when the body is malformed.
+    /// Each is named by its 9router label ("Account 1"); a name shared by several active connections
+    /// gets its provider appended ("Account 1 (claude)") so the meter's source stays unambiguous.
+    static func activeConnections(_ body: Data) -> [Connection]? {
         guard let root = ProviderParse.jsonObject(body),
-              let connections = root["connections"] as? [[String: Any]] else { return nil }
-        return connections.compactMap { connection in
+              let raw = root["connections"] as? [[String: Any]] else { return nil }
+        let active: [(id: String, name: String?, provider: String?)] = raw.compactMap { connection in
             guard (connection["isActive"] as? Bool) != false,
                   let id = connection["id"] as? String, !id.isEmpty else { return nil }
-            return id
+            let name = (connection["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            return (id, name, connection["provider"] as? String)
+        }
+        let nameCounts = active.reduce(into: [String: Int]()) { counts, entry in
+            if let name = entry.name { counts[name, default: 0] += 1 }
+        }
+        return active.map { entry in
+            guard let name = entry.name else {
+                return Connection(id: entry.id, name: entry.provider ?? entry.id)
+            }
+            let isShared = (nameCounts[name] ?? 0) > 1
+            return Connection(id: entry.id, name: isShared ? "\(name) (\(entry.provider ?? entry.id))" : name)
         }
     }
 
     /// Session / Weekly quota windows from one `/api/usage/<connectionId>` payload. Credit balances,
     /// unlimited entries, and model-specific windows (e.g. `weekly fable (7d)`) are skipped: only the
     /// account-wide Session and Weekly windows feed the headline meters.
-    static func quotas(_ body: Data) -> [Quota] {
+    static func quotas(_ body: Data, source: String? = nil) -> [Quota] {
         guard let root = ProviderParse.jsonObject(body),
               let quotas = root["quotas"] as? [String: Any] else { return [] }
         return quotas.compactMap { name, value in
@@ -64,7 +85,8 @@ enum NineRouterUsageMapper {
                   let used = ProviderParse.number(entry["used"]),
                   let total = ProviderParse.number(entry["total"]), total > 0 else { return nil }
             let resetsAt = (entry["resetAt"] as? String).flatMap(OpenUsageISO8601.date(from:))
-            return Quota(window: window, percent: ProviderParse.clampPercent(used / total * 100), resetsAt: resetsAt)
+            return Quota(window: window, percent: ProviderParse.clampPercent(used / total * 100),
+                         resetsAt: resetsAt, source: source)
         }
     }
 
@@ -82,27 +104,32 @@ enum NineRouterUsageMapper {
         }
     }
 
-    /// The tightest Session and Weekly meters across every connection's quotas. Ties keep the window
+    /// The tightest Session and Weekly meters across every connection's quotas, plus the connection
+    /// each came from (keyed by line label, for `ProviderSnapshot.lineSources`). Ties keep the window
     /// that resets sooner, since it frees up first.
-    static func tightestQuotaLines(_ quotas: [Quota]) -> [MetricLine] {
+    static func tightestQuotas(_ quotas: [Quota]) -> (lines: [MetricLine], sources: [String: String]) {
         let windows: [(window: Window, label: String, periodMs: Int)] = [
             (.session, "Session", sessionPeriodMs),
             (.weekly, "Weekly", weeklyPeriodMs)
         ]
-        return windows.compactMap { window, label, period in
+        var lines: [MetricLine] = []
+        var sources: [String: String] = [:]
+        for (window, label, period) in windows {
             let candidates = quotas.filter { $0.window == window }
             guard let tightest = candidates.max(by: { lhs, rhs in
                 if lhs.percent != rhs.percent { return lhs.percent < rhs.percent }
                 return (lhs.resetsAt ?? .distantFuture) > (rhs.resetsAt ?? .distantFuture)
-            }) else { return nil }
-            return .progress(
+            }) else { continue }
+            lines.append(.progress(
                 label: label,
                 used: tightest.percent,
                 limit: 100,
                 format: .percent,
                 resetsAt: tightest.resetsAt,
                 periodDurationMs: period
-            )
+            ))
+            sources[label] = tightest.source
         }
+        return (lines, sources)
     }
 }

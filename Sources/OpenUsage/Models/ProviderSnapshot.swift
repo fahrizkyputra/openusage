@@ -16,6 +16,10 @@ struct ProviderSnapshot: Hashable, Sendable, Codable {
     /// surfaces as the provider header's amber triangle rather than blanking the provider. Cached with the
     /// snapshot; cleared on the next refresh when the condition resolves.
     var warning: String?
+    /// Optional per-row source note, keyed by metric line label — e.g. 9router's "Account 1" on the
+    /// Session meter, naming which upstream account the aggregated value came from. Rendered as quiet
+    /// secondary text beside the row title. `nil` for providers whose rows need no attribution.
+    var lineSources: [String: String]?
     /// Set only on error snapshots: a stable, non-PII bucket for the failure, read by telemetry on the
     /// failure path. Always `nil` on success (and error snapshots aren't cached), so it never persists.
     var errorCategory: ErrorCategory?
@@ -28,6 +32,7 @@ struct ProviderSnapshot: Hashable, Sendable, Codable {
         refreshedAt: Date = Date(),
         usageHistory: ProviderUsageHistory? = nil,
         warning: String? = nil,
+        lineSources: [String: String]? = nil,
         errorCategory: ErrorCategory? = nil
     ) {
         self.providerID = providerID
@@ -37,6 +42,7 @@ struct ProviderSnapshot: Hashable, Sendable, Codable {
         self.refreshedAt = refreshedAt
         self.usageHistory = usageHistory
         self.warning = warning
+        self.lineSources = lineSources
         self.errorCategory = errorCategory
     }
 
@@ -53,7 +59,8 @@ struct ProviderSnapshot: Hashable, Sendable, Codable {
         lines: [MetricLine],
         refreshedAt: Date,
         usageHistory: ProviderUsageHistory? = nil,
-        warning: String? = nil
+        warning: String? = nil,
+        lineSources: [String: String]? = nil
     ) -> ProviderSnapshot {
         ProviderSnapshot(
             providerID: provider.id,
@@ -62,7 +69,8 @@ struct ProviderSnapshot: Hashable, Sendable, Codable {
             lines: lines,
             refreshedAt: refreshedAt,
             usageHistory: usageHistory,
-            warning: warning
+            warning: warning,
+            lineSources: lineSources
         )
     }
 

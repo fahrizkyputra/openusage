@@ -81,27 +81,33 @@ final class NineRouterProvider: ProviderRuntime {
 
         // Quotas are best-effort: a connection without plan data (plain API keys, custom endpoints)
         // or a failing upstream must not blank out the spend rows.
-        let quotaLines = await quotaLines(auth: auth)
-        return ProviderSnapshot.make(provider: provider, plan: nil, lines: quotaLines + lines, refreshedAt: now())
+        let quota = await tightestQuotas(auth: auth)
+        return ProviderSnapshot.make(
+            provider: provider,
+            plan: nil,
+            lines: quota.lines + lines,
+            refreshedAt: now(),
+            lineSources: quota.sources.isEmpty ? nil : quota.sources
+        )
     }
 
-    private func quotaLines(auth: NineRouterAuth) async -> [MetricLine] {
+    private func tightestQuotas(auth: NineRouterAuth) async -> (lines: [MetricLine], sources: [String: String]) {
         guard case .success(let body) = await load({ try await usageClient.fetchConnections(auth: auth) }),
-              let connectionIDs = NineRouterUsageMapper.activeConnectionIDs(body) else {
+              let connections = NineRouterUsageMapper.activeConnections(body) else {
             AppLog.warn(LogTag.plugin("9router"), "connection list unavailable; skipping quota meters")
-            return []
+            return ([], [:])
         }
         var quotas: [NineRouterUsageMapper.Quota] = []
-        for id in connectionIDs {
+        for connection in connections {
             guard case .success(let usageBody) = await load({
-                try await usageClient.fetchConnectionUsage(connectionID: id, auth: auth)
+                try await usageClient.fetchConnectionUsage(connectionID: connection.id, auth: auth)
             }) else {
                 AppLog.info(LogTag.plugin("9router"), "quota unavailable for one connection; skipping it")
                 continue
             }
-            quotas += NineRouterUsageMapper.quotas(usageBody)
+            quotas += NineRouterUsageMapper.quotas(usageBody, source: connection.name)
         }
-        return NineRouterUsageMapper.tightestQuotaLines(quotas)
+        return NineRouterUsageMapper.tightestQuotas(quotas)
     }
 
     /// Run one call and classify the outcome: the body on 2xx, an auth failure on 401/403, or a typed

@@ -58,6 +58,9 @@ struct WidgetData: Hashable {
     var infoNote: String?
     /// Optional source note for value rows such as Cursor spend history.
     var valueTooltipNote: String?
+    /// Which account an aggregated row came from (e.g. "Account 1"), shown as secondary text beside the
+    /// title. Stamped by `WidgetDataStore` from `ProviderSnapshot.lineSources`; `nil` for most rows.
+    var sourceLabel: String?
     /// False when no real provider metric backs this tile. The view then shows a "No data" state
     /// instead of the descriptor's placeholder template numbers. True for real data and direct fixtures.
     var hasData: Bool = true

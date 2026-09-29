@@ -118,9 +118,23 @@ final class NineRouterUsageMapperTests: XCTestCase {
         XCTAssertNil(NineRouterUsageMapper.spendLine(label: "Today", body: data(#"{"error":"Invalid period"}"#)))
     }
 
-    func testActiveConnectionIDsSkipsInactive() {
-        XCTAssertEqual(NineRouterUsageMapper.activeConnectionIDs(data(connectionsJSON)), ["claude-1", "claude-2", "glm-1"])
-        XCTAssertNil(NineRouterUsageMapper.activeConnectionIDs(data("[]")))
+    func testActiveConnectionsSkipsInactiveAndKeepsNames() {
+        let connections = NineRouterUsageMapper.activeConnections(data(connectionsJSON))
+        XCTAssertEqual(connections?.map(\.id), ["claude-1", "claude-2", "glm-1"])
+        XCTAssertEqual(connections?.map(\.name), ["Account 1", "Account 2", "GLM"])
+        XCTAssertNil(NineRouterUsageMapper.activeConnections(data("[]")))
+    }
+
+    func testDuplicateOrMissingConnectionNamesStayUnambiguous() {
+        let body = #"""
+        {"connections":[
+          {"id":"a","provider":"claude","name":"Account 1","isActive":true},
+          {"id":"b","provider":"codex","name":"Account 1","isActive":true},
+          {"id":"c","provider":"glm","name":"  ","isActive":true}
+        ]}
+        """#
+        XCTAssertEqual(NineRouterUsageMapper.activeConnections(data(body))?.map(\.name),
+                       ["Account 1 (claude)", "Account 1 (codex)", "glm"])
     }
 
     func testQuotaNamesMapToAccountWideWindowsOnly() {
@@ -138,9 +152,10 @@ final class NineRouterUsageMapperTests: XCTestCase {
     }
 
     func testTightestWindowWinsAcrossConnections() throws {
-        let quotas = NineRouterUsageMapper.quotas(data(claudeAccount1JSON)) + NineRouterUsageMapper.quotas(data(claudeAccount2JSON))
+        let quotas = NineRouterUsageMapper.quotas(data(claudeAccount1JSON), source: "Account 1")
+            + NineRouterUsageMapper.quotas(data(claudeAccount2JSON), source: "Account 2")
 
-        let lines = NineRouterUsageMapper.tightestQuotaLines(quotas)
+        let (lines, sources) = NineRouterUsageMapper.tightestQuotas(quotas)
 
         XCTAssertEqual(lines.map(\.label), ["Session", "Weekly"])
         guard case .progress(_, let sessionUsed, 100, .percent, let sessionReset, let sessionPeriod, _) = lines[0],
@@ -153,10 +168,14 @@ final class NineRouterUsageMapperTests: XCTestCase {
         // Account 2's weekly (80%) beats Account 1's (55%); the model-specific 99% window is ignored.
         XCTAssertEqual(weeklyUsed, 80)
         XCTAssertEqual(weeklyReset, OpenUsageISO8601.date(from: "2026-10-01T00:00:00.000Z"))
+        // Each meter names the account it came from — here they differ.
+        XCTAssertEqual(sources, ["Session": "Account 1", "Weekly": "Account 2"])
     }
 
     func testNoQuotasMeansNoMeters() {
-        XCTAssertTrue(NineRouterUsageMapper.tightestQuotaLines([]).isEmpty)
+        let result = NineRouterUsageMapper.tightestQuotas([])
+        XCTAssertTrue(result.lines.isEmpty)
+        XCTAssertTrue(result.sources.isEmpty)
     }
 }
 
@@ -190,6 +209,7 @@ final class NineRouterProviderTests: XCTestCase {
 
         XCTAssertNil(snapshot.errorCategory)
         XCTAssertEqual(snapshot.lines.map(\.label), ["Session", "Weekly", "Today", "Last 7 Days", "Last 30 Days"])
+        XCTAssertEqual(snapshot.lineSources, ["Session": "Account 1", "Weekly": "Account 2"])
         let token = NineRouterAuthStore.cliToken(machineID: machineID, secret: cliSecret)
         XCTAssertTrue(http.requests.allSatisfy { $0.headers[NineRouterUsageClient.tokenHeader] == token })
         let periods = http.requests.filter { $0.url.path == NineRouterUsageClient.statsPath }
@@ -208,6 +228,34 @@ final class NineRouterProviderTests: XCTestCase {
 
         XCTAssertNil(snapshot.errorCategory)
         XCTAssertEqual(snapshot.lines.map(\.label), ["Today", "Last 7 Days", "Last 30 Days"])
+        XCTAssertNil(snapshot.lineSources)
+    }
+
+    func testDataStoreStampsSourceLabelOnMeterRowsOnly() async throws {
+        let (provider, _) = makeProvider { request in
+            switch request.url.path {
+            case NineRouterUsageClient.statsPath: return response(statsJSON)
+            case NineRouterUsageClient.providersPath: return response(connectionsJSON)
+            case "/api/usage/claude-1": return response(claudeAccount1JSON)
+            default: return response(#"{"quotas":{}}"#)
+            }
+        }
+        let suite = "NineRouterProviderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = WidgetDataStore(
+            registry: WidgetRegistry(providers: [provider.provider], descriptors: provider.widgetDescriptors),
+            providers: [provider],
+            cache: ProviderSnapshotCache(userDefaults: defaults, storageKey: "snapshots", ttl: 600, now: { Date() }),
+            defaults: defaults
+        )
+
+        await store.refreshAll()
+
+        let byID = Dictionary(uniqueKeysWithValues: provider.widgetDescriptors.map { ($0.id, $0) })
+        XCTAssertEqual(store.data(for: try XCTUnwrap(byID["9router.session"])).sourceLabel, "Account 1")
+        XCTAssertEqual(store.data(for: try XCTUnwrap(byID["9router.weekly"])).sourceLabel, "Account 1")
+        XCTAssertNil(store.data(for: try XCTUnwrap(byID["9router.today"])).sourceLabel)
     }
 
     func testRejectedTokenReportsInvalidToken() async {
