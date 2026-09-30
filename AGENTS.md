@@ -77,3 +77,7 @@ Always fail loudly into error logging (log file, PostHog) and show friendly erro
 - Use title case for any hardcoded copy used as a title.
 - Match the existing design language; OpenUsage has a specific look and feel.
 - Only add tooltips (`hoverTooltip`) when explicitly asked to. Don't add them proactively to new controls.
+
+## Fork: agent skills
+
+- Adding or changing a provider in this fork: follow [`.agents/skills/openusage-add-provider/SKILL.md`](.agents/skills/openusage-add-provider/SKILL.md).
