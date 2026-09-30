@@ -23,6 +23,8 @@ enum DefaultLayout {
     static let metricIDs: [String] = [
         "9router.session", "9router.weekly", "9router.accounts", "9router.trend",
         "9router.today", "9router.yesterday", "9router.last30",
+        "9router-kitchen.session", "9router-kitchen.weekly", "9router-kitchen.accounts", "9router-kitchen.trend",
+        "9router-kitchen.today", "9router-kitchen.yesterday", "9router-kitchen.last30",
 
         "antigravity.geminiPro", "antigravity.geminiWeekly", "antigravity.claude", "antigravity.claudeWeekly",
         "antigravity.trend", "antigravity.today", "antigravity.yesterday", "antigravity.last30",
@@ -80,6 +82,7 @@ enum DefaultLayout {
     /// `LayoutStore`, like `metricIDs`.
     static let pinnedMetricIDs: [String] = [
         "9router.session", "9router.weekly",
+        "9router-kitchen.session", "9router-kitchen.weekly",
         "antigravity.geminiPro", "antigravity.geminiWeekly",
         "claude.session", "claude.weekly",
         "codex.session", "codex.weekly",
@@ -99,6 +102,7 @@ enum DefaultLayout {
         // 9router: Session, Weekly (tightest window across connections), and Usage Trend stay above
         // the fold; the spend tiles sit below the caret, like Claude and Codex.
         "9router.today", "9router.yesterday", "9router.last30",
+        "9router-kitchen.today", "9router-kitchen.yesterday", "9router-kitchen.last30",
         // Antigravity: the Gemini pool pair and usage trend stay above the fold; the non-Gemini
         // pool pair and spend-history rows sit below the caret, matching the other local scanners.
         "antigravity.claude", "antigravity.claudeWeekly",

@@ -37,4 +37,14 @@ protocol APIKeyManaging: ProviderRuntime {
     /// Remove the saved key. If an env key is present the status falls back to `fromEnvironment`;
     /// otherwise `notSet`.
     func deleteAPIKey() throws
+    /// Section title in the Customize detail — "API Key" unless the secret is something else
+    /// (9router Kitchen stores a dashboard password).
+    var apiKeyTitle: String { get }
+    /// Placeholder shown in the empty key field.
+    var apiKeyPlaceholder: String { get }
+}
+
+extension APIKeyManaging {
+    var apiKeyTitle: String { "API Key" }
+    var apiKeyPlaceholder: String { "sk-or-v1-…" }
 }

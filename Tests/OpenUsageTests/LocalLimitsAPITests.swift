@@ -205,6 +205,7 @@ final class LocalLimitsAPITests: XCTestCase {
         }
         let expected: [String: Set<String>] = [
             "9router": ["session", "weekly"],
+            "9router-kitchen": ["session", "weekly"],
             "claude": ["session", "weekly", "sonnet", "fable", "extraUsage", "rateLimitResets"],
             "codex": ["session", "weekly", "spark", "sparkWeekly", "credits", "creditValue", "rateLimitResets"],
             "cursor": ["totalUsage", "grokBot", "autoUsage", "apiUsage", "onDemand", "requests", "credits"],

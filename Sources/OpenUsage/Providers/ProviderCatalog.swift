@@ -60,6 +60,7 @@ enum ProviderCatalog {
         providers += [
             CursorProvider(),
             NineRouterProvider(),
+            NineRouterKitchenProvider(),
             AntigravityProvider(),
             CopilotProvider(defaults: defaults),
             DevinProvider(),

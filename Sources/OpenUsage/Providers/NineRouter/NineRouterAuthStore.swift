@@ -1,12 +1,35 @@
 import CryptoKit
 import Foundation
 
-/// The locally derived credential 9router's own CLI uses to reach its dashboard API.
+/// Where a 9router server lives and how to authenticate against its dashboard API.
 struct NineRouterAuth: Hashable, Sendable {
-    /// Base URL of the running 9router server, e.g. `http://127.0.0.1:20128`.
+    enum Credential: Hashable, Sendable {
+        /// The `x-9r-cli-token` 9router's own CLI derives from local files (local server only).
+        case cliToken(String)
+        /// A 9router API key, sent as a Bearer token to kitchen-usage-proxy.
+        case apiKey(String)
+    }
+
+    /// Base URL of the 9router server, e.g. `http://127.0.0.1:20128`.
     var baseURL: URL
-    /// Value of the `x-9r-cli-token` header.
-    var cliToken: String
+    var credential: Credential
+
+    init(baseURL: URL, cliToken: String) {
+        self.init(baseURL: baseURL, credential: .cliToken(cliToken))
+    }
+
+    init(baseURL: URL, credential: Credential) {
+        self.baseURL = baseURL
+        self.credential = credential
+    }
+
+    /// Request headers carrying the credential.
+    var headers: [String: String] {
+        switch credential {
+        case .cliToken(let token): [NineRouterUsageClient.tokenHeader: token]
+        case .apiKey(let key): ["Authorization": "Bearer \(key)"]
+        }
+    }
 }
 
 enum NineRouterAuthError: Error, LocalizedError, Equatable {

@@ -63,89 +63,27 @@ final class NineRouterProvider: ProviderRuntime {
             return ProviderSnapshot.error(provider: provider, error: error)
         }
 
-        // The per-day chart is required: it proves the server is up and the token works. Model
-        // rankings are best-effort, so the totals still render without them.
-        let chart: Data
-        switch await load({ try await usageClient.fetchChart(.thirtyDays, auth: auth) }) {
-        case .success(let body): chart = body
-        case .authFailure: return ProviderSnapshot.error(provider: provider, error: NineRouterAuthError.invalidToken)
-        case .failed(let error): return ProviderSnapshot.error(provider: provider, error: error)
-        }
-        let todayStats = await load({ try await usageClient.fetchStats(.today, auth: auth) }).body
-        let last30Stats = await load({ try await usageClient.fetchStats(.thirtyDays, auth: auth) }).body
+        let fetcher = NineRouterUsageFetcher(
+            usageClient: usageClient,
+            logTag: LogTag.plugin(provider.id),
+            unreachableError: .notRunning
+        )
         let now = now()
-        guard let daily = NineRouterDailyUsage.fromLocalChart(
-            chart, todayStats: todayStats, last30Stats: last30Stats, now: now
-        ) else {
-            return ProviderSnapshot.error(provider: provider, error: NineRouterUsageError.invalidResponse)
+        switch await fetcher.fetch(auth: auth, now: now) {
+        case .success(let lines, let sources, let history, let accounts):
+            return ProviderSnapshot.make(
+                provider: provider,
+                plan: nil,
+                lines: lines,
+                refreshedAt: now,
+                usageHistory: history,
+                lineSources: sources.isEmpty ? nil : sources,
+                accounts: accounts.isEmpty ? nil : accounts
+            )
+        case .authFailure:
+            return ProviderSnapshot.error(provider: provider, error: NineRouterAuthError.invalidToken)
+        case .failed(let error):
+            return ProviderSnapshot.error(provider: provider, error: error)
         }
-        var lines: [MetricLine] = []
-        daily.appendLines(to: &lines, now: now, note: daily.sourceNote())
-
-        // Quotas are best-effort: a connection without plan data (plain API keys, custom endpoints)
-        // or a failing upstream must not blank out the spend rows.
-        let quota = await tightestQuotas(auth: auth, last30Stats: last30Stats, now: now)
-        return ProviderSnapshot.make(
-            provider: provider,
-            plan: nil,
-            lines: quota.lines + lines,
-            refreshedAt: now,
-            usageHistory: daily.history,
-            lineSources: quota.sources.isEmpty ? nil : quota.sources,
-            accounts: quota.accounts.isEmpty ? nil : quota.accounts
-        )
-    }
-
-    private func tightestQuotas(auth: NineRouterAuth, last30Stats: Data?, now: Date)
-        async -> (lines: [MetricLine], sources: [String: String], accounts: [GatewayAccount]) {
-        guard case .success(let body) = await load({ try await usageClient.fetchConnections(auth: auth) }),
-              let connections = NineRouterUsageMapper.activeConnections(body) else {
-            AppLog.warn(LogTag.plugin("9router"), "connection list unavailable; skipping quota meters")
-            return ([], [:], [])
-        }
-        var quotas: [NineRouterUsageMapper.Quota] = []
-        var usageByID: [String: Data] = [:]
-        for connection in connections {
-            guard case .success(let usageBody) = await load({
-                try await usageClient.fetchConnectionUsage(connectionID: connection.id, auth: auth)
-            }) else {
-                AppLog.info(LogTag.plugin("9router"), "quota unavailable for one connection; skipping it")
-                continue
-            }
-            usageByID[connection.id] = usageBody
-            quotas += NineRouterUsageMapper.quotas(usageBody, source: connection.name)
-        }
-        let tightest = NineRouterUsageMapper.tightestQuotas(quotas)
-        let accounts = NineRouterUsageMapper.localAccounts(
-            connections: body, usageByID: usageByID, stats30: last30Stats, now: now
-        )
-        let lines = tightest.lines + [NineRouterUsageMapper.accountsLine(accounts)].compactMap { $0 }
-        return (lines, tightest.sources, accounts)
-    }
-
-    /// Run one call and classify the outcome: the body on 2xx, an auth failure on 401/403, or a typed
-    /// failure for any other status or a transport error (server not running).
-    private func load(_ call: () async throws -> HTTPResponse) async -> EndpointResult {
-        do {
-            let response = try await call()
-            if response.statusCode == 401 || response.statusCode == 403 { return .authFailure }
-            guard (200..<300).contains(response.statusCode) else {
-                return .failed(.requestFailed(response.statusCode))
-            }
-            return .success(response.body)
-        } catch {
-            return .failed(.notRunning)
-        }
-    }
-}
-
-private enum EndpointResult {
-    case success(Data)
-    case authFailure
-    case failed(NineRouterUsageError)
-
-    var body: Data? {
-        if case .success(let data) = self { return data }
-        return nil
     }
 }

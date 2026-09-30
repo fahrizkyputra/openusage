@@ -83,7 +83,7 @@ final class NineRouterAuthStoreTests: XCTestCase {
 
         let auth = try store.load()
 
-        XCTAssertEqual(auth.cliToken, NineRouterAuthStore.cliToken(machineID: machineID, secret: cliSecret))
+        XCTAssertEqual(auth.credential, .cliToken(NineRouterAuthStore.cliToken(machineID: machineID, secret: cliSecret)))
         XCTAssertEqual(auth.baseURL.absoluteString, "http://127.0.0.1:20128")
         XCTAssertTrue(store.hasCredentialFiles())
     }

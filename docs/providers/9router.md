@@ -72,3 +72,35 @@ Optional overrides (shell profile):
 - `/api/providers` — best-effort; the list of active connections.
 - `/api/usage/<connectionId>` — best-effort, once per active connection; its `session` and `weekly`
   quotas feed the Session and Weekly meters. A failing connection is skipped.
+
+## 9router Kitchen (remote server)
+
+A second card, **9router Kitchen**, tracks a remote 9router server with the same rows, and joins
+Total Spend the same way. Its history is not combined across Macs by iCloud Sync, because every Mac
+already reads the server's total. The
+host isn't in the source: a packaged build carries it in its Info.plist (`NineRouterKitchenURL`),
+and `NINEROUTER_KITCHEN_URL` overrides it. A build without a host keeps the card off. The local **9router** card is unchanged and
+keeps reading `http://127.0.0.1:20128`.
+
+9router only serves usage to admin credentials, so the Kitchen host runs
+**kitchen-usage-proxy**: a small read-only service at `/openusage/` that accepts any *active* 9router
+API key. This card uses such a key — no dashboard password:
+
+- Add it in **Customize → 9router Kitchen → API Key**, or write `~/.config/openusage/9router-kitchen.json`
+  as `{ "apiKey": "sk-…" }`, or export `NINEROUTER_KITCHEN_API_KEY`.
+- `NINEROUTER_KITCHEN_URL` points the card at a Kitchen host (the proxy must be mounted at
+  `/openusage` there).
+
+Calls (`GET`, `Authorization: Bearer <key>`): `/openusage/v1/daily?days=30` (per-day spend in the
+server's time zone, plus top models for Today and Last 30 Days), `/openusage/v1/connections`, and
+`/openusage/v1/connections/<id>/usage`. The proxy returns the same fields 9router does, filtered down
+to what this card reads. When the server's time zone isn't this Mac's, the rows' hover note names it.
+
+Errors:
+
+- **"isn't configured in this build"** — no Kitchen host; set `NINEROUTER_KITCHEN_URL`.
+- **"No 9router Kitchen API key"** — add a key.
+- **"rejected the API key"** — the key is unknown, or deactivated in the Kitchen dashboard.
+- **"rate-limiting requests"** — too many failed keys from your network, or too many requests; wait.
+- **"usage service can't reach 9router"** — server-side problem with the proxy; tell the Kitchen admin.
+- **"Couldn't reach 9router Kitchen"** — network, or the host is down.

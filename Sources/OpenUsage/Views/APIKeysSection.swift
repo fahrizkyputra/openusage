@@ -28,11 +28,9 @@ struct APIKeysSection: View {
     @State private var revealedKey: String?
     @State private var actionError: String?
 
-    private static let inputPlaceholder = "sk-or-v1-…"
-
     var body: some View {
         VStack(alignment: .leading, spacing: density.headerToCardSpacing) {
-            Text("API Key")
+            Text(provider.apiKeyTitle)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 8)
@@ -128,7 +126,7 @@ struct APIKeysSection: View {
         if editable {
             APIKeyField(
                 text: $input,
-                placeholder: Self.inputPlaceholder,
+                placeholder: provider.apiKeyPlaceholder,
                 readOnly: false,
                 displayText: "",
                 reveal: revealInput,

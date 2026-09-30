@@ -239,9 +239,22 @@ extension NineRouterAuthError: CategorizedError {
 extension NineRouterUsageError: CategorizedError {
     var errorCategory: ErrorCategory {
         switch self {
-        case .notRunning: .network
+        case .notRunning, .unreachable: .network
         case .invalidResponse: .decoding
         case .requestFailed(let status): ErrorCategory.http(status)
+        }
+    }
+}
+
+extension NineRouterKitchenAuthError: CategorizedError {
+    var errorCategory: ErrorCategory {
+        switch self {
+        case .missingKey: .notLoggedIn
+        case .notConfigured: .notAvailable
+        case .invalidKey, .invalidBaseURL: .authInvalid
+        case .rateLimited: .rateLimited
+        case .proxyMisconfigured: .http5xx
+        case .saveFailed, .deleteFailed: .other
         }
     }
 }
