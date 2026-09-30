@@ -15,6 +15,9 @@ final class AppContainer {
     /// Single source of truth for which providers the user has turned off. Both stores consult it (via
     /// injected closures) and the Customize provider list drives it.
     let enablement: ProviderEnablementStore
+    /// Team builds only: the "New version available" banner's release check (inert without
+    /// `TeamUpdateRepo` in the Info.plist).
+    let teamUpdates = TeamUpdateChecker()
     /// Providers that need a user-supplied API key (currently OpenRouter and Z.ai), conforming to
     /// `APIKeyManaging`. Each matching Customize provider detail shows an API Key section and writes
     /// changes through the capability. Empty when no installed provider needs a user key.

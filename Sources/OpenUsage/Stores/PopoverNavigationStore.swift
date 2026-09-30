@@ -6,6 +6,8 @@ enum PopoverScreen: Hashable, Sendable {
     case dashboard
     case customize
     case settings
+    /// Team builds: how to update to the latest team release (opened from the dashboard banner).
+    case teamUpdate
 
     /// Left-to-right order for the popover's horizontal screen-switch slide: the dashboard is home on
     /// the left, with Customize and Settings to its right. The slide reads its direction from these
@@ -15,6 +17,7 @@ enum PopoverScreen: Hashable, Sendable {
         case .dashboard: 0
         case .customize: 1
         case .settings: 2
+        case .teamUpdate: 3
         }
     }
 }

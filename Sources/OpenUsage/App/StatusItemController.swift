@@ -70,6 +70,7 @@ final class StatusItemController: NSObject {
                     .environment(container.dataStore)
                     .environment(container.transparency)
                     .environment(updater)
+                    .environment(container.teamUpdates)
                     .environment(\.codexResetClaims, container.codexResetClaims)
             )
         )

@@ -39,6 +39,12 @@ struct PopoverTopBar: View {
             } trailing: {
                 EmptyView()
             }
+        case .teamUpdate:
+            navigationBar(title: "Update") {
+                withAnimation(Motion.modeSwitch) { layout.screen = .dashboard }
+            } trailing: {
+                EmptyView()
+            }
         }
     }
 

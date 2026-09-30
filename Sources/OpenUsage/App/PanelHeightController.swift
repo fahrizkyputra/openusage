@@ -133,6 +133,7 @@ final class PanelHeightController {
         case .dashboard: "openusage.panel.height.dashboard"
         case .customize: "openusage.panel.height.customize"
         case .settings: "openusage.panel.height.settings"
+        case .teamUpdate: "openusage.panel.height.teamUpdate"
         }
     }
 }

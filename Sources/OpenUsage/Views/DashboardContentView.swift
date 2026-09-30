@@ -13,6 +13,7 @@ struct DashboardContentView: View {
     @Binding var reorderLift: ReorderLift?
     @Binding var scrollPosition: ScrollPosition
 
+    @Environment(TeamUpdateChecker.self) private var teamUpdates
     @AppStorage(DensitySetting.key) private var density = DensitySetting.regular
     @AppStorage(TotalSpendSetting.key) private var showTotalSpend = true
 
@@ -25,6 +26,12 @@ struct DashboardContentView: View {
                     UpdateBannerCard(version: updateVersion)
                         .padding(.bottom, density.sectionSpacing)
                         .transition(.scale(scale: 0.95).combined(with: .opacity))
+                } else if let teamRelease = teamUpdates.available {
+                    TeamUpdateBannerCard(version: teamRelease.version) {
+                        withAnimation(Motion.modeSwitch) { layout.screen = .teamUpdate }
+                    }
+                    .padding(.bottom, density.sectionSpacing)
+                    .transition(.scale(scale: 0.95).combined(with: .opacity))
                 }
                 // The one-time first-run hint sits above the provider sections (and above the
                 // empty-state line, which a fresh install can hit while nothing has data yet).
@@ -37,6 +44,7 @@ struct DashboardContentView: View {
             }
             .animation(Motion.spring, value: container.onboarding.isCustomizeHintPending)
             .animation(Motion.spring, value: updater.availableUpdateVersion)
+            .animation(Motion.spring, value: teamUpdates.available)
             .padding(.horizontal, horizontalPadding)
             .padding(.top, density.contentTopPadding)
             .padding(.bottom, bottomGap)

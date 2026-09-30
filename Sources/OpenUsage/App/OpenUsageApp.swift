@@ -90,6 +90,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemController = StatusItemController(container: container, updater: updater)
         // Starts background update checks (release build only; dormant under preview/`swift run`).
         updater.start()
+        container.teamUpdates.start()
     }
 
     /// Flush queued telemetry on quit. The SDK's lifecycle autocapture is off (we emit our own daily

@@ -476,6 +476,8 @@ struct DashboardView: View {
             )
         case .settings:
             SettingsScreen()
+        case .teamUpdate:
+            TeamUpdateScreen(horizontalPadding: Self.outerPadding)
         }
     }
 

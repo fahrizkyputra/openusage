@@ -14,6 +14,7 @@ set -euo pipefail
 # Env (required — organisation-specific values stay out of this repo):
 #   TEAM_BUNDLE_ID    bundle id, e.g. com.example.openusage.team
 #   TEAM_KITCHEN_URL  9router Kitchen host baked into Info.plist, e.g. https://kitchen.example.com
+#   TEAM_UPDATE_REPO  owner/name of the private repo whose GitHub Releases the in-app update banner checks
 # Env (optional):
 #   TEAM_VERSION      version string (default: 0.7.0-team.<commit count>)
 
@@ -26,6 +27,8 @@ KITCHEN_URL="${TEAM_KITCHEN_URL:?set TEAM_KITCHEN_URL (e.g. https://kitchen.exam
 case "$KITCHEN_URL" in https://*|http://*) ;; *) echo "TEAM_KITCHEN_URL must be an http(s) URL" >&2; exit 1 ;; esac
 KITCHEN_URL="${KITCHEN_URL%/}"
 KITCHEN_HOST="${KITCHEN_URL#*://}"
+UPDATE_REPO="${TEAM_UPDATE_REPO:?set TEAM_UPDATE_REPO (e.g. example/openusage-team)}"
+echo "$UPDATE_REPO" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' || { echo "TEAM_UPDATE_REPO must be owner/name" >&2; exit 1; }
 MIN_SYSTEM_VERSION="15.0"
 BUILD="$(git rev-list --count HEAD)"
 VERSION="${TEAM_VERSION:-0.7.0-team.$BUILD}"
@@ -104,6 +107,7 @@ cat >"$APP_CONTENTS/Info.plist" <<PLIST
   <key>NSPrincipalClass</key><string>NSApplication</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NineRouterKitchenURL</key><string>$KITCHEN_URL</string>
+  <key>TeamUpdateRepo</key><string>$UPDATE_REPO</string>
 </dict>
 </plist>
 PLIST
@@ -149,7 +153,8 @@ Shows automatically if 9router runs on this Mac (`http://localhost:20128`). Othe
 
 - Session / Weekly show the upstream account closest to its limit, named beside the row
   (e.g. "Weekly · Account 1"). Today / Last 7 Days / Last 30 Days are totals across all accounts.
-- No auto-updates: install a newer zip over the old app when one is shared.
+- Updates: when a newer release exists, the dashboard shows "New version available". Click
+  "Update now" and follow the steps (it gives you a prompt for your coding agent).
 - Telemetry is disabled in this build; nothing is sent to OpenUsage's analytics.
 - Command line: `/Applications/OpenUsage.app/Contents/Helpers/openusage 9router-kitchen`
 EOF
