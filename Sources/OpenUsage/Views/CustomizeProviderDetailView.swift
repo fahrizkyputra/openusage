@@ -36,6 +36,9 @@ struct CustomizeProviderDetailView: View {
                 if ProviderAccountID.family(of: providerID) == "codex" {
                     CodexPricingSection()
                 }
+                if layout.isSpendCapable(providerID) {
+                    TotalSpendInclusionSection(providerID: providerID)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .animation(Motion.spring, value: layout.expandedMetricIDs)

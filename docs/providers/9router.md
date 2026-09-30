@@ -9,9 +9,8 @@ proxy that rotates your AI coding requests across several upstream accounts.
 |---|---|
 | Session | The tightest 5-hour window across every active upstream connection |
 | Weekly | The tightest weekly window across every active upstream connection |
-| Today | Cost and tokens routed through 9router today |
-| Last 7 Days | Cost and tokens over the last 7 days |
-| Last 30 Days | Cost and tokens over the last 30 days |
+| Usage Trend | Tokens per day over the last 30 days |
+| Today / Yesterday / Last 30 Days | Cost and tokens routed through 9router; they also feed [Total Spend](../dashboard.md#total-spend) |
 
 9router spreads requests over several accounts, so Session and Weekly show the account closest to its
 limit — the one that will throttle you first — and name it beside the row title (e.g. "Weekly · Account 1").
@@ -20,7 +19,14 @@ connection's label in the 9router dashboard; when two active connections share a
 added ("Account 1 (claude)"). Model-specific windows and credit balances are left out.
 Connections that report no plan quota (plain API keys, custom endpoints) only count toward spend.
 
-Costs are the ones 9router records per request, not a local estimate.
+Cost is what 9router prices each request at (API rates), so it's marked as an estimate: on a
+subscription it's API-equivalent value, not your bill. Days follow 9router's own clock. Hovering
+Today or Last 30 Days lists the top models; Yesterday shows totals only, because 9router ranks
+models per period, not per day. With iCloud Sync on, 9router history from your Macs is combined,
+like Claude's.
+
+If Claude Code (or another tracked client) sends its requests through 9router, the same usage shows
+on both cards. Turn off **Include in Total Spend** for one of them so the total isn't doubled.
 
 ## Where credentials come from
 
@@ -49,8 +55,9 @@ Optional overrides (shell profile):
 
 `GET` calls against the local server, each with the `x-9r-cli-token` header:
 
-- `/api/usage/stats?period=today|7d|30d` — required; the spend rows come from `totalCost` and
-  prompt + completion tokens.
+- `/api/usage/chart?period=30d` — required; one point per day (cost, tokens) for the spend tiles,
+  Usage Trend, and Total Spend.
+- `/api/usage/stats?period=today|30d` — best-effort; the top models (`byModel`) for the hover lists.
 - `/api/providers` — best-effort; the list of active connections.
 - `/api/usage/<connectionId>` — best-effort, once per active connection; its `session` and `weekly`
   quotas feed the Session and Weekly meters. A failing connection is skipped.

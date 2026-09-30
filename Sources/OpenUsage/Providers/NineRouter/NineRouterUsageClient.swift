@@ -3,12 +3,13 @@ import Foundation
 /// Calls the local 9router server's dashboard API (the same routes its web dashboard and CLI use).
 /// Every route is authenticated with the locally derived `x-9r-cli-token` header.
 struct NineRouterUsageClient: Sendable {
-    /// Periods `/api/usage/stats` accepts: `today`, `24h`, `7d`, `30d`, `60d`, `all`.
+    /// Periods `/api/usage/stats` and `/api/usage/chart` accept that OpenUsage uses.
     enum Period: String, Sendable, CaseIterable {
         case today
-        case sevenDays = "7d"
         case thirtyDays = "30d"
     }
+
+    static let chartPath = "/api/usage/chart"
 
     static let statsPath = "/api/usage/stats"
     static let providersPath = "/api/providers"
@@ -24,6 +25,11 @@ struct NineRouterUsageClient: Sendable {
     /// Aggregate requests / tokens / cost for one period across every connection.
     func fetchStats(_ period: Period, auth: NineRouterAuth) async throws -> HTTPResponse {
         try await get(Self.statsPath, query: [URLQueryItem(name: "period", value: period.rawValue)], auth: auth)
+    }
+
+    /// One point per server-local day for the period, oldest first: `{label, cost, tokens, requests}`.
+    func fetchChart(_ period: Period, auth: NineRouterAuth) async throws -> HTTPResponse {
+        try await get(Self.chartPath, query: [URLQueryItem(name: "period", value: period.rawValue)], auth: auth)
     }
 
     /// Every configured upstream connection (Claude accounts, API keys, …) with its active flag.

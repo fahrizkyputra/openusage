@@ -6,8 +6,28 @@ private let cliSecret = "a1b2c3d4e5f6"
 
 private let statsJSON = #"""
 {"totalRequests":1613,"totalPromptTokens":1200000,"totalCompletionTokens":34000,"totalCachedTokens":596322,
- "totalCost":34.88,"byProvider":{"claude":{"requests":1613}},"byModel":{},"pending":{},"recentRequests":[]}
+ "totalCost":34.88,"byProvider":{"claude":{"requests":1613}},
+ "byModel":{"opus|claude":{"rawModel":"claude-opus-5-5","provider":"claude","promptTokens":1000000,"completionTokens":34000,"cost":30.0},
+            "glm|glm":{"rawModel":"glm-5.3","provider":"glm","promptTokens":200000,"completionTokens":0,"cost":4.88}},
+ "pending":{},"recentRequests":[]}
 """#
+
+/// 30 days, oldest first; day i costs i dollars and 1000*i tokens, so today = $29, yesterday = $28.
+private let chartJSON: String = {
+    let points = (0..<30).map { #"{"label":"x","tokens":\#($0 * 1000),"cost":\#($0),"requests":\#($0)}"# }
+    return "[" + points.joined(separator: ",") + "]"
+}()
+
+/// Noon on a fixed local date, so Today / Yesterday are unambiguous in any test-runner zone.
+private let fixedNow: Date = {
+    Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 30, hour: 12))!
+}()
+
+private func spend(_ line: MetricLine?) -> (cost: Double?, tokens: Double?, estimated: Bool)? {
+    guard case .values(_, let values, _, _, _, _) = line else { return nil }
+    let dollars = values.first { $0.kind == .dollars }
+    return (dollars?.number, values.first { $0.kind == .count }?.number, dollars?.estimated ?? false)
+}
 
 private let connectionsJSON = #"""
 {"connections":[
@@ -104,18 +124,68 @@ final class NineRouterAuthStoreTests: XCTestCase {
 // MARK: - Mapper
 
 final class NineRouterUsageMapperTests: XCTestCase {
-    func testSpendLineCarriesCostAndTokens() throws {
-        let line = try XCTUnwrap(NineRouterUsageMapper.spendLine(label: "Today", body: data(statsJSON)))
-
-        guard case .values(let label, let values, _, _, _, _) = line else { return XCTFail("expected values line") }
-        XCTAssertEqual(label, "Today")
-        XCTAssertEqual(values.first { $0.kind == .dollars }?.number, 34.88)
-        XCTAssertEqual(values.first { $0.kind == .count }?.number, 1_234_000)
-        XCTAssertFalse(values.contains { $0.estimated })
+    func testLocalChartKeysDaysByPositionAndRanksModels() throws {
+        let daily = try XCTUnwrap(NineRouterDailyUsage.fromLocalChart(
+            data(chartJSON), todayStats: data(statsJSON), last30Stats: data(statsJSON), now: fixedNow
+        ))
+        XCTAssertEqual(daily.days.count, 30)
+        XCTAssertEqual(daily.days.first?.date, "2026-09-01")
+        XCTAssertEqual(daily.days.last, .init(date: "2026-09-30", costUSD: 29, tokens: 29_000))
+        XCTAssertEqual(daily.todayModels.map(\.model), ["claude-opus-5-5", "glm-5.3"])
+        XCTAssertEqual(daily.todayModels.first?.tokens, 1_034_000)
+        XCTAssertNil(NineRouterDailyUsage.fromLocalChart(data("[]"), todayStats: nil, last30Stats: nil, now: fixedNow))
     }
 
-    func testSpendLineRejectsNonStatsBody() {
-        XCTAssertNil(NineRouterUsageMapper.spendLine(label: "Today", body: data(#"{"error":"Invalid period"}"#)))
+    func testSpendTilesYesterdayTrendAndModelBreakdowns() throws {
+        let daily = try XCTUnwrap(NineRouterDailyUsage.fromLocalChart(
+            data(chartJSON), todayStats: data(statsJSON), last30Stats: data(statsJSON), now: fixedNow
+        ))
+        var lines: [MetricLine] = []
+        daily.appendLines(to: &lines, now: fixedNow, note: daily.sourceNote())
+
+        XCTAssertEqual(lines.map(\.label), ["Today", "Yesterday", "Last 30 Days", "Usage Trend"])
+        let today = try XCTUnwrap(spend(lines.first { $0.label == "Today" }))
+        XCTAssertEqual(today.cost, 29)
+        XCTAssertEqual(today.tokens, 29_000)
+        XCTAssertTrue(today.estimated, "9router cost is API-rate pricing, not a bill")
+        XCTAssertEqual(spend(lines.first { $0.label == "Yesterday" })?.cost, 28)
+        XCTAssertEqual(spend(lines.first { $0.label == "Last 30 Days" })?.cost, Double((0..<30).reduce(0, +)))
+
+        func breakdown(_ label: String) -> ModelUsageBreakdown? {
+            guard case .values(_, _, _, _, _, let b) = lines.first(where: { $0.label == label }) else { return nil }
+            return b
+        }
+        XCTAssertEqual(breakdown("Today")?.models.map(\.model), ["claude-opus-5-5", "glm-5.3"])
+        XCTAssertEqual(breakdown("Last 30 Days")?.models.map(\.model), ["claude-opus-5-5", "glm-5.3"])
+        XCTAssertNil(breakdown("Yesterday"), "9router only ranks models per period, so Yesterday has totals only")
+    }
+
+    func testProxyDailyParsesAndRejectsBadDates() throws {
+        let body = #"{"timeZone":"UTC","days":[{"date":"2026-09-29","costUSD":1.5,"tokens":10},{"date":"2026-09-30","costUSD":2,"tokens":20}],"models":{"today":[{"model":"m","costUSD":2,"tokens":20}]}}"#
+        let daily = try XCTUnwrap(NineRouterDailyUsage.parseProxy(data(body)))
+        XCTAssertEqual(daily.timeZone, "UTC")
+        XCTAssertEqual(daily.days.map(\.date), ["2026-09-29", "2026-09-30"])
+        XCTAssertEqual(daily.todayModels.map(\.model), ["m"])
+        XCTAssertNil(NineRouterDailyUsage.parseProxy(data(#"{"days":[{"date":"Sep 29","costUSD":1}]}"#)))
+    }
+
+    func testServerDaysWinOverTheMacCalendar() throws {
+        // The server is already on Oct 1 while this Mac is still on Sep 30: Today must be the server's
+        // last day, not an empty Mac-side "Sep 30 minus nothing".
+        let body = #"{"timeZone":"Pacific/Kiritimati","days":[{"date":"2026-09-30","costUSD":1,"tokens":1},{"date":"2026-10-01","costUSD":5,"tokens":5}]}"#
+        let daily = try XCTUnwrap(NineRouterDailyUsage.parseProxy(data(body)))
+        var lines: [MetricLine] = []
+        daily.appendLines(to: &lines, now: fixedNow, note: "n")
+        XCTAssertEqual(spend(lines.first { $0.label == "Today" })?.cost, 5)
+        XCTAssertEqual(spend(lines.first { $0.label == "Yesterday" })?.cost, 1)
+    }
+
+    func testSourceNoteNamesServerZoneOnlyWhenItDiffers() {
+        var daily = NineRouterDailyUsage(timeZone: "UTC", days: [], todayModels: [], last30Models: [])
+        let jakarta = TimeZone(identifier: "Asia/Jakarta")!
+        XCTAssertTrue(daily.sourceNote(macTimeZone: jakarta).contains("(UTC)"))
+        daily.timeZone = "Asia/Jakarta"
+        XCTAssertEqual(daily.sourceNote(macTimeZone: jakarta), NineRouterDailyUsage.estimateNote)
     }
 
     func testActiveConnectionsSkipsInactiveAndKeepsNames() {
@@ -188,7 +258,7 @@ final class NineRouterProviderTests: XCTestCase {
         let provider = NineRouterProvider(
             authStore: NineRouterAuthStore(files: authFiles(), environment: FakeEnvironment()),
             usageClient: NineRouterUsageClient(http: http),
-            now: { Date(timeIntervalSince1970: 1_800_000_000) }
+            now: { fixedNow }
         )
         return (provider, http)
     }
@@ -197,6 +267,7 @@ final class NineRouterProviderTests: XCTestCase {
         let (provider, http) = makeProvider { request in
             switch request.url.path {
             case NineRouterUsageClient.statsPath: return response(statsJSON)
+            case NineRouterUsageClient.chartPath: return response(chartJSON)
             case NineRouterUsageClient.providersPath: return response(connectionsJSON)
             case "/api/usage/claude-1": return response(claudeAccount1JSON)
             case "/api/usage/claude-2": return response(claudeAccount2JSON)
@@ -208,26 +279,31 @@ final class NineRouterProviderTests: XCTestCase {
         let snapshot = await provider.refresh()
 
         XCTAssertNil(snapshot.errorCategory)
-        XCTAssertEqual(snapshot.lines.map(\.label), ["Session", "Weekly", "Today", "Last 7 Days", "Last 30 Days"])
+        XCTAssertEqual(snapshot.lines.map(\.label), ["Session", "Weekly", "Today", "Yesterday", "Last 30 Days", "Usage Trend"])
         XCTAssertEqual(snapshot.lineSources, ["Session": "Account 1", "Weekly": "Account 2"])
+        XCTAssertEqual(snapshot.usageHistory?.series.daily.count, 30)
         let token = NineRouterAuthStore.cliToken(machineID: machineID, secret: cliSecret)
         XCTAssertTrue(http.requests.allSatisfy { $0.headers[NineRouterUsageClient.tokenHeader] == token })
         let periods = http.requests.filter { $0.url.path == NineRouterUsageClient.statsPath }
             .compactMap { URLComponents(url: $0.url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value }
-        XCTAssertEqual(periods, ["today", "7d", "30d"])
+        XCTAssertEqual(periods, ["today", "30d"])
+        XCTAssertTrue(http.requests.contains {
+            $0.url.path == NineRouterUsageClient.chartPath && $0.url.query == "period=30d"
+        })
         XCTAssertFalse(http.requests.contains { $0.url.path == "/api/usage/off-1" })
     }
 
     func testQuotaFailuresKeepSpendRows() async {
         let (provider, _) = makeProvider { request in
             if request.url.path == NineRouterUsageClient.statsPath { return response(statsJSON) }
+            if request.url.path == NineRouterUsageClient.chartPath { return response(chartJSON) }
             return response("{}", status: 500)
         }
 
         let snapshot = await provider.refresh()
 
         XCTAssertNil(snapshot.errorCategory)
-        XCTAssertEqual(snapshot.lines.map(\.label), ["Today", "Last 7 Days", "Last 30 Days"])
+        XCTAssertEqual(snapshot.lines.map(\.label), ["Today", "Yesterday", "Last 30 Days", "Usage Trend"])
         XCTAssertNil(snapshot.lineSources)
     }
 
@@ -235,6 +311,7 @@ final class NineRouterProviderTests: XCTestCase {
         let (provider, _) = makeProvider { request in
             switch request.url.path {
             case NineRouterUsageClient.statsPath: return response(statsJSON)
+            case NineRouterUsageClient.chartPath: return response(chartJSON)
             case NineRouterUsageClient.providersPath: return response(connectionsJSON)
             case "/api/usage/claude-1": return response(claudeAccount1JSON)
             default: return response(#"{"quotas":{}}"#)

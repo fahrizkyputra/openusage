@@ -1,9 +1,10 @@
 import Foundation
 
 /// 9router — a local AI gateway (https://github.com/decolua/9router) that rotates requests across
-/// several upstream accounts. OpenUsage reads the gateway's own dashboard API on loopback: spend per
-/// period from `/api/usage/stats`, and the tightest Session / Weekly plan window across every active
-/// upstream connection.
+/// several upstream accounts. OpenUsage reads the gateway's own dashboard API on loopback: per-day
+/// spend from `/api/usage/chart` (the shared Today / Yesterday / Last 30 Days tiles, Usage Trend, and
+/// Total Spend), model rankings from `/api/usage/stats`, and the tightest Session / Weekly plan window
+/// across every active upstream connection.
 @MainActor
 final class NineRouterProvider: ProviderRuntime {
     let provider = Provider(
@@ -30,23 +31,22 @@ final class NineRouterProvider: ProviderRuntime {
         self.now = now
     }
 
-    /// Spend rows in display order, paired with the stats period that backs each one.
-    static let spendRows: [(label: String, period: NineRouterUsageClient.Period)] = [
-        ("Today", .today),
-        ("Last 7 Days", .sevenDays),
-        ("Last 30 Days", .thirtyDays)
-    ]
-
     var widgetDescriptors: [WidgetDescriptor] {
+        Self.widgetDescriptors(for: provider, historyScope: .machineLocal)
+    }
+
+    /// The shared 9router card: Session, Weekly, Usage Trend, then the shared spend tiles (which feed
+    /// Total Spend). `historyScope` is `.machineLocal` for a per-Mac gateway (iCloud sync sums Macs)
+    /// and `.accountWide` for a shared server (every Mac already sees the server's total).
+    static func widgetDescriptors(for provider: Provider, historyScope: UsageHistoryDescriptor.Scope) -> [WidgetDescriptor] {
         [
-            .percent(id: "9router.session", provider: provider, title: "Session", metricLabel: "Session")
+            .percent(id: "\(provider.id).session", provider: provider, title: "Session", metricLabel: "Session")
                 .exportingLimit("session", unit: "percent"),
-            .percent(id: "9router.weekly", provider: provider, title: "Weekly", metricLabel: "Weekly")
+            .percent(id: "\(provider.id).weekly", provider: provider, title: "Weekly", metricLabel: "Weekly")
                 .exportingLimit("weekly", unit: "percent"),
-            .combined(id: "9router.today", provider: provider, title: "Today", isUsagePeriod: true),
-            .combined(id: "9router.week", provider: provider, title: "Last 7 Days", isUsagePeriod: true),
-            .combined(id: "9router.month", provider: provider, title: "Last 30 Days", isUsagePeriod: true)
-        ]
+            .usageTrend(provider: provider)
+                .exportingHistory(scope: historyScope, estimatedCost: true, sourceNote: NineRouterDailyUsage.estimateNote)
+        ] + WidgetDescriptor.spendTiles(provider: provider, valueTooltipNote: NineRouterDailyUsage.estimateNote)
     }
 
     func hasLocalCredentials() async -> Bool {
@@ -62,22 +62,24 @@ final class NineRouterProvider: ProviderRuntime {
             return ProviderSnapshot.error(provider: provider, error: error)
         }
 
-        // Stats are required: they prove the server is up and the token works. The first call decides
-        // the error the user sees when nothing comes back.
-        var lines: [MetricLine] = []
-        for row in Self.spendRows {
-            switch await load({ try await usageClient.fetchStats(row.period, auth: auth) }) {
-            case .success(let body):
-                guard let line = NineRouterUsageMapper.spendLine(label: row.label, body: body) else {
-                    return ProviderSnapshot.error(provider: provider, error: NineRouterUsageError.invalidResponse)
-                }
-                lines.append(line)
-            case .authFailure:
-                return ProviderSnapshot.error(provider: provider, error: NineRouterAuthError.invalidToken)
-            case .failed(let error):
-                return ProviderSnapshot.error(provider: provider, error: error)
-            }
+        // The per-day chart is required: it proves the server is up and the token works. Model
+        // rankings are best-effort, so the totals still render without them.
+        let chart: Data
+        switch await load({ try await usageClient.fetchChart(.thirtyDays, auth: auth) }) {
+        case .success(let body): chart = body
+        case .authFailure: return ProviderSnapshot.error(provider: provider, error: NineRouterAuthError.invalidToken)
+        case .failed(let error): return ProviderSnapshot.error(provider: provider, error: error)
         }
+        let todayStats = await load({ try await usageClient.fetchStats(.today, auth: auth) }).body
+        let last30Stats = await load({ try await usageClient.fetchStats(.thirtyDays, auth: auth) }).body
+        let now = now()
+        guard let daily = NineRouterDailyUsage.fromLocalChart(
+            chart, todayStats: todayStats, last30Stats: last30Stats, now: now
+        ) else {
+            return ProviderSnapshot.error(provider: provider, error: NineRouterUsageError.invalidResponse)
+        }
+        var lines: [MetricLine] = []
+        daily.appendLines(to: &lines, now: now, note: daily.sourceNote())
 
         // Quotas are best-effort: a connection without plan data (plain API keys, custom endpoints)
         // or a failing upstream must not blank out the spend rows.
@@ -86,7 +88,8 @@ final class NineRouterProvider: ProviderRuntime {
             provider: provider,
             plan: nil,
             lines: quota.lines + lines,
-            refreshedAt: now(),
+            refreshedAt: now,
+            usageHistory: daily.history,
             lineSources: quota.sources.isEmpty ? nil : quota.sources
         )
     }
@@ -130,4 +133,9 @@ private enum EndpointResult {
     case success(Data)
     case authFailure
     case failed(NineRouterUsageError)
+
+    var body: Data? {
+        if case .success(let data) = self { return data }
+        return nil
+    }
 }

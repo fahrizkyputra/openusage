@@ -32,9 +32,15 @@ extension LayoutStore {
     /// `displayGroups`: a provider whose every metric is hidden in Customize still spends money and
     /// must still count, and look-alike dollar rows from other providers (OpenRouter's API-spend
     /// "Today") must not.
+    /// Providers feeding the Total Spend card: enabled, spend-capable, and not left out by the user.
     var spendCapableProviders: [Provider] {
-        let capableIDs = Set(registry.descriptors.filter(\.isSpendTile).map(\.providerID))
-        return orderedProviders().filter { capableIDs.contains($0.id) && isProviderEnabled($0.id) }
+        orderedProviders().filter { isSpendCapable($0.id) && isProviderEnabled($0.id) && isIncludedInTotalSpend($0.id) }
+    }
+
+    /// Whether a provider exposes the shared spend tiles, so its Customize detail offers the
+    /// "Include in Total Spend" switch.
+    func isSpendCapable(_ providerID: String) -> Bool {
+        registry.descriptors(for: providerID).contains(where: \.isSpendTile)
     }
 
     // MARK: - Provider grouping

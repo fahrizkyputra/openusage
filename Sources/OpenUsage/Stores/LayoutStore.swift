@@ -60,6 +60,11 @@ final class LayoutStore {
     /// stay open across popover closes and app restarts.
     private(set) var expandedProviderIDs: Set<String>
 
+    /// Spend-capable providers the user left out of the Total Spend card (Customize → provider →
+    /// "Include in Total Spend"). Stored as exclusions so every provider — including ones shipped
+    /// later — counts by default. Only the card's sum changes; the provider's own spend rows stay.
+    private(set) var totalSpendExcludedProviderIDs: Set<String>
+
     /// The three transient popover pills, each an auto-clearing `TransientNotice` (was three copy-pasted
     /// value+trigger+clearTask machines). The public `pinLimitNotice`/`shareConfirmation`/
     /// `customizationNotice` surface below forwards to these, so call sites are unchanged.
@@ -144,6 +149,7 @@ final class LayoutStore {
         pinnedMetricIDs = initial.pinnedMetricIDs
         expandedMetricIDs = initial.expandedMetricIDs
         expandedProviderIDs = initial.expandedProviderIDs
+        totalSpendExcludedProviderIDs = Set(persistence.loadTotalSpendExcluded() ?? [])
         defaultExpandedOnEnableIDs = initial.defaultExpandedOnEnableIDs
         menuBarStyle = initial.menuBarStyle
 
@@ -168,6 +174,21 @@ final class LayoutStore {
         }
         persistExpandedProviders()
         return true
+    }
+
+    func isIncludedInTotalSpend(_ providerID: String) -> Bool {
+        !totalSpendExcludedProviderIDs.contains(providerID)
+    }
+
+    func setIncludedInTotalSpend(_ included: Bool, for providerID: String) {
+        guard registry.provider(id: providerID) != nil,
+              isIncludedInTotalSpend(providerID) != included else { return }
+        if included {
+            totalSpendExcludedProviderIDs.remove(providerID)
+        } else {
+            totalSpendExcludedProviderIDs.insert(providerID)
+        }
+        persistence.saveTotalSpendExcluded(totalSpendExcludedProviderIDs)
     }
 
     // MARK: - Customize mutations
@@ -395,6 +416,8 @@ final class LayoutStore {
         persistExpandOnEnable()
         expandedProviderIDs = []
         persistExpandedProviders()
+        totalSpendExcludedProviderIDs = []
+        persistence.saveTotalSpendExcluded([])
         persistSeededDefaults(Set(LayoutOrdering.knownMetricIDs(defaultMetricIDs, registry: registry)))
         persist()
     }
@@ -439,9 +462,12 @@ final class LayoutStore {
         persistExpanded()
         persistExpandOnEnable()
 
-        // Default is a collapsed card.
+        // Default is a collapsed card that counts toward Total Spend.
         if expandedProviderIDs.remove(providerID) != nil {
             persistExpandedProviders()
+        }
+        if totalSpendExcludedProviderIDs.remove(providerID) != nil {
+            persistence.saveTotalSpendExcluded(totalSpendExcludedProviderIDs)
         }
 
         syncPlacedOrder() // persists `placed`

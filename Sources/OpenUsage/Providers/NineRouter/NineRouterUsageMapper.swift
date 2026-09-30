@@ -2,8 +2,7 @@ import Foundation
 
 /// Normalizes 9router's dashboard API payloads into OpenUsage metric lines.
 ///
-/// - `/api/usage/stats?period=…` → one combined "cost · tokens" row per period. The cost is the one
-///   9router itself computes per request, so it is not marked as a local estimate.
+/// Spend rows come from `NineRouterDailyUsage`; this mapper handles the plan quotas.
 /// - `/api/usage/<connectionId>` → the plan quotas 9router reads from each upstream account. 9router
 ///   rotates requests across connections, so OpenUsage shows the **tightest** Session and Weekly window
 ///   across all active connections — the one that will throttle you first.
@@ -29,20 +28,6 @@ enum NineRouterUsageMapper {
         var resetsAt: Date?
         /// Display name of the connection that reported it (e.g. "Account 1").
         var source: String? = nil
-    }
-
-    // MARK: - Stats
-
-    /// A combined spend row from a `/api/usage/stats` payload, or nil when the body isn't a stats object.
-    static func spendLine(label: String, body: Data) -> MetricLine? {
-        guard let root = ProviderParse.jsonObject(body),
-              let cost = ProviderParse.number(root["totalCost"]) else { return nil }
-        let prompt = ProviderParse.number(root["totalPromptTokens"]) ?? 0
-        let completion = ProviderParse.number(root["totalCompletionTokens"]) ?? 0
-        return .values(label: label, values: [
-            MetricValue(number: max(0, cost), kind: .dollars),
-            MetricValue(number: max(0, prompt + completion), kind: .count, label: "tokens")
-        ])
     }
 
     // MARK: - Connections
