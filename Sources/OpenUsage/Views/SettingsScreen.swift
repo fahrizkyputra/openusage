@@ -227,7 +227,7 @@ struct SettingsScreen: View {
             .padding(.horizontal, 12)
             .padding(.vertical, density.controlRowPadding)
             // Daily activity and crash reports are always on; the toggle only gates extra analytics.
-            Text("A daily anonymous active ping and crash reports are always sent. This toggle shares extra anonymous usage analytics — provider refreshes and error types. No account details, credentials, or usage values are sent.")
+            Text("Team build: telemetry is disabled. Nothing is sent — no daily ping, crash reports, or analytics — regardless of this toggle.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
