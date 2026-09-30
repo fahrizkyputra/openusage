@@ -65,7 +65,7 @@ struct NineRouterKitchenAuthStore: Sendable {
     init(
         files: TextFileAccessing = LocalTextFileAccessor(),
         environment: EnvironmentReading = ProcessEnvironmentReader(),
-        bundledBaseURL: String? = Bundle.main.object(forInfoDictionaryKey: NineRouterKitchenAuthStore.infoPlistKey) as? String
+        bundledBaseURL: String? = NineRouterKitchenAuthStore.bundledBaseURL()
     ) {
         self.environment = environment
         self.bundledBaseURL = bundledBaseURL
@@ -76,6 +76,19 @@ struct NineRouterKitchenAuthStore: Sendable {
             environment: environment,
             makeError: { NineRouterKitchenAuthError($0) }
         )
+    }
+
+    /// The host baked into the containing app's Info.plist. `Bundle.main` alone misses it for the
+    /// bundled CLI (`OpenUsage.app/Contents/Helpers/openusage` has no bundle of its own), so fall back
+    /// to the `.app` that contains the running executable.
+    static func bundledBaseURL(
+        main: Bundle = .main,
+        executableURL: URL? = Bundle.main.executableURL
+    ) -> String? {
+        if let value = main.object(forInfoDictionaryKey: infoPlistKey) as? String { return value }
+        guard let appURL = executableURL.flatMap(ContainingAppBundle.url(for:)),
+              let app = Bundle(url: appURL) else { return nil }
+        return app.object(forInfoDictionaryKey: infoPlistKey) as? String
     }
 
     func loadAPIKey() -> String? { store.loadKey() }

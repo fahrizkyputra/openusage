@@ -68,6 +68,25 @@ final class NineRouterKitchenAuthStoreTests: XCTestCase {
         XCTAssertEqual(try custom.baseURL().absoluteString, "https://other.example.com")
     }
 
+    func testBundledCLIReadsHostFromContainingApp() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let contents = root.appendingPathComponent("OpenUsage.app/Contents")
+        let helper = contents.appendingPathComponent("Helpers/openusage")
+        try FileManager.default.createDirectory(at: helper.deletingLastPathComponent(), withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: helper.path, contents: Data())
+        let plist: [String: Any] = [
+            "CFBundleIdentifier": "com.example.test", "CFBundlePackageType": "APPL",
+            NineRouterKitchenAuthStore.infoPlistKey: "https://kitchen.example.com"
+        ]
+        try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+            .write(to: contents.appendingPathComponent("Info.plist"))
+
+        // The test runner's own Bundle.main has no Kitchen key, like the CLI helper.
+        XCTAssertEqual(NineRouterKitchenAuthStore.bundledBaseURL(executableURL: helper), "https://kitchen.example.com")
+        XCTAssertNil(NineRouterKitchenAuthStore.bundledBaseURL(executableURL: root.appendingPathComponent("loose-binary")))
+    }
+
     func testNoHostInSourceWhenUnconfigured() {
         let store = kitchenStore(key: nil, bundled: nil)
         XCTAssertNil(store.configuredBaseURL())
