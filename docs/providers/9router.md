@@ -79,7 +79,9 @@ A second card, **9router Kitchen**, tracks a remote 9router server with the same
 Total Spend the same way. Its history is not combined across Macs by iCloud Sync, because every Mac
 already reads the server's total. The
 host isn't in the source: a packaged build carries it in its Info.plist (`NineRouterKitchenURL`),
-and `NINEROUTER_KITCHEN_URL` overrides it. A build without a host keeps the card off. The local **9router** card is unchanged and
+and `NINEROUTER_KITCHEN_URL` overrides it. A build without a host keeps the card off. A build with a
+host turns the card on at first launch even without a key, so it shows "No 9router Kitchen API key"
+until you add one. Updating from an older build does the same once, if no key is saved yet. The local **9router** card is unchanged and
 keeps reading `http://127.0.0.1:20128`.
 
 9router only serves usage to admin credentials, so the Kitchen host runs

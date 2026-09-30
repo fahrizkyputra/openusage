@@ -39,6 +39,7 @@ enum NewProviderSeeder {
             // Same concurrent local-only probe as first-run detection and the Reset All reseed.
             let newProviders = providers.filter { newIDs.contains($0.provider.id) }
             let detected = await FirstRunSeeder.detectLocalProviders(newProviders)
+                .union(newProviders.filter(\.enablesWithoutCredentials).map(\.provider.id))
             for id in detected.sorted() {
                 // The probe takes a moment; if the user already turned the provider on themselves,
                 // leave their toggle alone (setEnabled would be a no-op anyway).
@@ -46,6 +47,31 @@ enum NewProviderSeeder {
                 AppLog.info(.config, "new provider \(id): credentials detected, enabling")
                 enablement.setEnabled(true, for: id)
             }
+        }
+    }
+}
+
+/// One-time catch-up for installs from before a provider started on without credentials (a team
+/// build's 9router Kitchen card, from v0.7.0-team.612): turn it on once, only while it has no
+/// credentials yet, so a user who never entered a key sees the card asking for one. Recorded per
+/// provider, so a user who turns it off afterwards keeps it off.
+@MainActor
+enum AlwaysOnProviderCatchUp {
+    static let doneKey = "openusage.alwaysOnCatchUp.v1"
+
+    static func runIfNeeded(
+        providers: [ProviderRuntime],
+        enablement: ProviderEnablementStore,
+        defaults: UserDefaults = .standard
+    ) async {
+        var done = Set(defaults.stringArray(forKey: doneKey) ?? [])
+        for provider in providers where provider.enablesWithoutCredentials && !done.contains(provider.provider.id) {
+            let id = provider.provider.id
+            done.insert(id)
+            defaults.set(Array(done).sorted(), forKey: doneKey)
+            guard !enablement.isEnabled(id), await !provider.hasLocalCredentials() else { continue }
+            AppLog.info(.config, "\(id): on once so its card can ask for credentials")
+            enablement.setEnabled(true, for: id)
         }
     }
 }

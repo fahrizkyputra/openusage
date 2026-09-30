@@ -43,6 +43,11 @@ final class NineRouterKitchenProvider: ProviderRuntime {
         NineRouterProvider.widgetDescriptors(for: provider, historyScope: .accountWide)
     }
 
+    /// On in any build that carries a Kitchen host (team builds): the API key can only be entered after
+    /// install, so the card starts on and shows "No 9router Kitchen API key" until it's added. Builds
+    /// without a host keep it off.
+    var enablesWithoutCredentials: Bool { authStore.configuredBaseURL() != nil }
+
     func hasLocalCredentials() async -> Bool {
         // Same sources as `refresh()`: a configured Kitchen host and a saved or exported API key.
         await loadOffMainActor { [authStore] in

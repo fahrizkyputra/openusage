@@ -124,6 +124,19 @@ final class AppContainer {
             providers: providers,
             enablement: enablement
         )
+        // Existing installs: turn an always-on provider (team Kitchen card) on once if it still has no
+        // key. Fresh installs are already covered by FirstRunSeeder; the per-provider marker keeps this
+        // from ever overriding a later "off".
+        if !isFreshInstall {
+            Task { [providers, enablement] in
+                await AlwaysOnProviderCatchUp.runIfNeeded(providers: providers, enablement: enablement)
+            }
+        } else {
+            UserDefaults.standard.set(
+                providers.filter(\.enablesWithoutCredentials).map(\.provider.id).sorted(),
+                forKey: AlwaysOnProviderCatchUp.doneKey
+            )
+        }
         self.providers = providers
         self.onboarding = onboarding
         self.registry = registry

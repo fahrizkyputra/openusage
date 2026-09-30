@@ -62,14 +62,17 @@ enum FirstRunSeeder {
         logPrefix: String,
         probeVerb: String = "probing"
     ) -> Task<Void, Never> {
-        let fallback = fallbackProviderIDs.intersection(Set(providers.map(\.provider.id)))
+        // Providers that start on without credentials (a team build's Kitchen card) join both the
+        // fallback and the detected set, so they never decide which of the two wins.
+        let alwaysOn = Set(providers.filter(\.enablesWithoutCredentials).map(\.provider.id))
+        let fallback = fallbackProviderIDs.intersection(Set(providers.map(\.provider.id))).union(alwaysOn)
         enablement.seedEnabledProviders(fallback)
         AppLog.info(.config, "\(logPrefix): seeded providers \(fallback.sorted()); \(probeVerb) local credentials")
         return Task {
             let detected = await detectLocalProviders(providers)
             AppLog.info(.config, "\(logPrefix): detected credentials for \(detected.sorted())")
-            guard enablement.enabledIDs == fallback, !detected.isEmpty else { return }
-            enablement.seedEnabledProviders(detected)
+            guard enablement.enabledIDs == fallback, !detected.subtracting(alwaysOn).isEmpty else { return }
+            enablement.seedEnabledProviders(detected.union(alwaysOn))
         }
     }
 

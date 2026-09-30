@@ -40,10 +40,16 @@ protocol ProviderRuntime: AnyObject {
     /// `FirstRunSeeder` to enable exactly the providers the user actually has. Mirror the credential
     /// sources `refresh()` reads, and run blocking loads via `loadOffMainActor`.
     func hasLocalCredentials() async -> Bool
+
+    /// Whether first-run (and new-provider) detection should turn this provider on even without local
+    /// credentials, so its card shows up and asks for them. False for every provider except a team
+    /// build's 9router Kitchen card, whose API key can only be entered after install.
+    var enablesWithoutCredentials: Bool { get }
 }
 
 extension ProviderRuntime {
     var allowsCachedLocalHistory: Bool { true }
+    var enablesWithoutCredentials: Bool { false }
 }
 
 /// Run a blocking, `Sendable` credential load off the MainActor.
