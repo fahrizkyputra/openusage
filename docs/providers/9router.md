@@ -9,6 +9,7 @@ proxy that rotates your AI coding requests across several upstream accounts.
 |---|---|
 | Session | The tightest 5-hour window across every active upstream connection |
 | Weekly | The tightest weekly window across every active upstream connection |
+| Accounts | How many upstream accounts are active, and how many are limited ("4 active · 1 limited"). Hover for the list |
 | Usage Trend | Tokens per day over the last 30 days |
 | Today / Yesterday / Last 30 Days | Cost and tokens routed through 9router; they also feed [Total Spend](../dashboard.md#total-spend) |
 
@@ -18,6 +19,11 @@ Each meter is picked on its own, so Session and Weekly can name different accoun
 connection's label in the 9router dashboard; when two active connections share a label, the provider is
 added ("Account 1 (claude)"). Model-specific windows and credit balances are left out.
 Connections that report no plan quota (plain API keys, custom endpoints) only count toward spend.
+
+Hover the **Accounts** value to see every active connection: its name and provider, Session and
+Weekly %, cost over the last 30 days, and a status — OK, Rate limited, No balance, Auth error, or
+Error — from 9router's last error within the past day (older errors count as recovered; the raw
+error text is never shown). Accounts with a plan quota are listed tightest first, the rest by cost.
 
 Cost is what 9router prices each request at (API rates), so it's marked as an estimate: on a
 subscription it's API-equivalent value, not your bill. Days follow 9router's own clock. Hovering

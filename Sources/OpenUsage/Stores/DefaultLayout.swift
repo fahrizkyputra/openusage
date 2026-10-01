@@ -21,7 +21,7 @@ enum DefaultLayout {
     }
 
     static let metricIDs: [String] = [
-        "9router.session", "9router.weekly", "9router.trend",
+        "9router.session", "9router.weekly", "9router.accounts", "9router.trend",
         "9router.today", "9router.yesterday", "9router.last30",
 
         "antigravity.geminiPro", "antigravity.geminiWeekly", "antigravity.claude", "antigravity.claudeWeekly",

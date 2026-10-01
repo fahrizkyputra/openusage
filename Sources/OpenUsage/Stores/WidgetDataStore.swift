@@ -545,6 +545,9 @@ final class WidgetDataStore {
            let data = resolve(line, descriptor: descriptor) {
             result = data
             result.sourceLabel = snapshot.lineSources?[descriptor.metricLabel]
+            if descriptor.metricLabel == GatewayAccount.lineLabel, let accounts = snapshot.accounts {
+                result.gatewayAccounts = accounts
+            }
         } else {
             // No real metric line backs this placed tile, so the sample's numbers are placeholders.
             // Flag it as no-data; the tile renders "No data" instead of inventing usage.

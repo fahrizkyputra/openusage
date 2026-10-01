@@ -279,8 +279,9 @@ final class NineRouterProviderTests: XCTestCase {
         let snapshot = await provider.refresh()
 
         XCTAssertNil(snapshot.errorCategory)
-        XCTAssertEqual(snapshot.lines.map(\.label), ["Session", "Weekly", "Today", "Yesterday", "Last 30 Days", "Usage Trend"])
+        XCTAssertEqual(snapshot.lines.map(\.label), ["Session", "Weekly", "Accounts", "Today", "Yesterday", "Last 30 Days", "Usage Trend"])
         XCTAssertEqual(snapshot.lineSources, ["Session": "Account 1", "Weekly": "Account 2"])
+        XCTAssertEqual(snapshot.accounts?.map(\.name), ["Account 1", "Account 2", "GLM"], "tightest window first, quota-less last")
         XCTAssertEqual(snapshot.usageHistory?.series.daily.count, 30)
         let token = NineRouterAuthStore.cliToken(machineID: machineID, secret: cliSecret)
         XCTAssertTrue(http.requests.allSatisfy { $0.headers[NineRouterUsageClient.tokenHeader] == token })
@@ -333,6 +334,10 @@ final class NineRouterProviderTests: XCTestCase {
         XCTAssertEqual(store.data(for: try XCTUnwrap(byID["9router.session"])).sourceLabel, "Account 1")
         XCTAssertEqual(store.data(for: try XCTUnwrap(byID["9router.weekly"])).sourceLabel, "Account 1")
         XCTAssertNil(store.data(for: try XCTUnwrap(byID["9router.today"])).sourceLabel)
+        let accountsRow = store.data(for: try XCTUnwrap(byID["9router.accounts"]))
+        XCTAssertEqual(accountsRow.unboundedDetail, "3 active")
+        XCTAssertEqual(accountsRow.gatewayAccounts.first?.name, "Account 1")
+        XCTAssertFalse(try XCTUnwrap(byID["9router.accounts"]).pinnable)
     }
 
     func testRejectedTokenReportsInvalidToken() async {
@@ -366,5 +371,63 @@ final class NineRouterProviderTests: XCTestCase {
 
         XCTAssertEqual(snapshot.errorCategory, .notLoggedIn)
         XCTAssertFalse(hasCredentials)
+    }
+}
+
+// MARK: - Accounts
+
+final class NineRouterAccountsTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func iso(_ hoursAgo: Double) -> String {
+        OpenUsageISO8601.string(from: now.addingTimeInterval(-hoursAgo * 3600))
+    }
+
+    func testLocalAccountsCarryWindowsCostAndStatusTightestFirst() {
+        let connections = #"""
+        {"connections":[
+          {"id":"a","provider":"claude","name":"personal 5 max","isActive":true,"testStatus":"active"},
+          {"id":"b","provider":"claude","name":"Account 2","isActive":true,"errorCode":429,"lastErrorAt":"\#(iso(1))","lastError":"[429] secret"},
+          {"id":"c","provider":"deepseek","name":"localkey","isActive":true,"errorCode":402,"lastErrorAt":"\#(iso(48))"},
+          {"id":"d","provider":"openai-compatible-chat-886bd6e6","name":"off","isActive":false}
+        ]}
+        """#
+        let usage: [String: Data] = [
+            "a": Data(#"{"quotas":{"session (5h)":{"used":34,"total":100},"weekly (7d)":{"used":4,"total":100}}}"#.utf8),
+            "b": Data(#"{"quotas":{"session (5h)":{"used":7,"total":100},"weekly (7d)":{"used":90,"total":100}}}"#.utf8),
+            "c": Data(#"{"quotas":{"Balance (USD)":{"used":0,"total":0,"isCreditBalance":true}}}"#.utf8)
+        ]
+        let stats = Data(#"{"byAccount":{"m1 (claude - personal 5 max)":{"connectionId":"a","cost":10},"m2 (claude - personal 5 max)":{"connectionId":"a","cost":5},"m (claude - Account 2)":{"connectionId":"b","cost":7}}}"#.utf8)
+
+        let accounts = NineRouterUsageMapper.localAccounts(
+            connections: Data(connections.utf8), usageByID: usage, stats30: stats, now: now
+        )
+
+        XCTAssertEqual(accounts.map(\.id), ["b", "a", "c"], "90% weekly first, then 34%, then quota-less")
+        XCTAssertEqual(accounts[0].status, .rateLimited)
+        XCTAssertEqual(accounts[1].cost30dUSD, 15)
+        XCTAssertEqual(accounts[1].sessionPercent, 34)
+        XCTAssertNil(accounts[2].tightestPercent)
+        XCTAssertEqual(accounts[2].status, .ok, "a 2-day-old error counts as recovered")
+        XCTAssertEqual(GatewayAccount.summary(accounts), "3 active · 1 limited")
+    }
+
+    func testProxyAccountsParseAndReorder() throws {
+        let body = #"{"accounts":[{"id":"x","name":"","provider":"glm","sessionPercent":null,"weeklyPercent":null,"cost30dUSD":3,"status":"no_balance"},{"id":"y","name":"AI-TECH 2","provider":"claude","sessionPercent":39,"weeklyPercent":81,"cost30dUSD":100,"status":"ok"}]}"#
+        let accounts = try XCTUnwrap(NineRouterUsageMapper.proxyAccounts(Data(body.utf8)))
+        XCTAssertEqual(accounts.map(\.id), ["y", "x"])
+        XCTAssertEqual(accounts[1].name, "glm", "an empty name falls back to the provider")
+        XCTAssertEqual(accounts[1].status, .noBalance)
+        XCTAssertNil(NineRouterUsageMapper.proxyAccounts(Data("{}".utf8)))
+    }
+
+    func testAccountsLineReadsTheSummary() {
+        let ok = GatewayAccount(id: "a", name: "A", provider: nil, sessionPercent: nil, weeklyPercent: nil, cost30dUSD: 0, status: .ok)
+        guard case .badge(let label, let text, _, _) = NineRouterUsageMapper.accountsLine([ok, ok]) else {
+            return XCTFail("expected a badge line")
+        }
+        XCTAssertEqual(label, "Accounts")
+        XCTAssertEqual(text, "2 active")
+        XCTAssertNil(NineRouterUsageMapper.accountsLine([]))
     }
 }

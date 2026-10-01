@@ -44,6 +44,7 @@ final class NineRouterProvider: ProviderRuntime {
                 .exportingLimit("session", unit: "percent"),
             .percent(id: "\(provider.id).weekly", provider: provider, title: "Weekly", metricLabel: "Weekly")
                 .exportingLimit("weekly", unit: "percent"),
+            .gatewayAccounts(id: "\(provider.id).accounts", provider: provider),
             .usageTrend(provider: provider)
                 .exportingHistory(scope: historyScope, estimatedCost: true, sourceNote: NineRouterDailyUsage.estimateNote)
         ] + WidgetDescriptor.spendTiles(provider: provider, valueTooltipNote: NineRouterDailyUsage.estimateNote)
@@ -83,24 +84,27 @@ final class NineRouterProvider: ProviderRuntime {
 
         // Quotas are best-effort: a connection without plan data (plain API keys, custom endpoints)
         // or a failing upstream must not blank out the spend rows.
-        let quota = await tightestQuotas(auth: auth)
+        let quota = await tightestQuotas(auth: auth, last30Stats: last30Stats, now: now)
         return ProviderSnapshot.make(
             provider: provider,
             plan: nil,
             lines: quota.lines + lines,
             refreshedAt: now,
             usageHistory: daily.history,
-            lineSources: quota.sources.isEmpty ? nil : quota.sources
+            lineSources: quota.sources.isEmpty ? nil : quota.sources,
+            accounts: quota.accounts.isEmpty ? nil : quota.accounts
         )
     }
 
-    private func tightestQuotas(auth: NineRouterAuth) async -> (lines: [MetricLine], sources: [String: String]) {
+    private func tightestQuotas(auth: NineRouterAuth, last30Stats: Data?, now: Date)
+        async -> (lines: [MetricLine], sources: [String: String], accounts: [GatewayAccount]) {
         guard case .success(let body) = await load({ try await usageClient.fetchConnections(auth: auth) }),
               let connections = NineRouterUsageMapper.activeConnections(body) else {
             AppLog.warn(LogTag.plugin("9router"), "connection list unavailable; skipping quota meters")
-            return ([], [:])
+            return ([], [:], [])
         }
         var quotas: [NineRouterUsageMapper.Quota] = []
+        var usageByID: [String: Data] = [:]
         for connection in connections {
             guard case .success(let usageBody) = await load({
                 try await usageClient.fetchConnectionUsage(connectionID: connection.id, auth: auth)
@@ -108,9 +112,15 @@ final class NineRouterProvider: ProviderRuntime {
                 AppLog.info(LogTag.plugin("9router"), "quota unavailable for one connection; skipping it")
                 continue
             }
+            usageByID[connection.id] = usageBody
             quotas += NineRouterUsageMapper.quotas(usageBody, source: connection.name)
         }
-        return NineRouterUsageMapper.tightestQuotas(quotas)
+        let tightest = NineRouterUsageMapper.tightestQuotas(quotas)
+        let accounts = NineRouterUsageMapper.localAccounts(
+            connections: body, usageByID: usageByID, stats30: last30Stats, now: now
+        )
+        let lines = tightest.lines + [NineRouterUsageMapper.accountsLine(accounts)].compactMap { $0 }
+        return (lines, tightest.sources, accounts)
     }
 
     /// Run one call and classify the outcome: the body on 2xx, an auth failure on 401/403, or a typed

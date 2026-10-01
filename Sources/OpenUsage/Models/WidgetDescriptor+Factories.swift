@@ -149,6 +149,14 @@ extension WidgetDescriptor {
                                 kind: .count, used: 0, limit: nil))
     }
 
+    /// A gateway card's "Accounts" row ("4 active · 1 limited"): hovering the value lists every upstream
+    /// account behind the card (see `GatewayAccountsDetail`). Not pinnable — the tray can't show a list.
+    static func gatewayAccounts(id: String, provider: Provider) -> WidgetDescriptor {
+        make(id: id, provider: provider, metricLabel: GatewayAccount.lineLabel,
+             sample: WidgetData(title: "Accounts", icon: provider.icon, kind: .count, used: 0, limit: nil),
+             pinnable: false)
+    }
+
     /// The Usage Trend row: a day-by-day token sparkline backed by a provider `.chart` line. Not
     /// pinnable — the tray can't draw a chart — but otherwise a normal Customize metric (toggle,
     /// reorder, hide). `isChart` tells the dashboard how to render live chart points.

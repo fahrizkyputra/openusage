@@ -298,6 +298,7 @@ struct WidgetRowView: View {
     /// popover that reads as "zero credits" (`hasModelBreakdown` already carries its own `hasData`).
     private var hasHoverPopover: Bool {
         data.hasModelBreakdown || (data.showsResetExpiries && data.hasData)
+            || (data.hasData && !data.gatewayAccounts.isEmpty)
     }
 
     private var unboundedRowContent: some View {
@@ -373,6 +374,10 @@ struct WidgetRowView: View {
             ) {
                 if let breakdown = data.modelBreakdown {
                     ModelUsageDetail(title: data.title, breakdown: breakdown) { inside in
+                        modelHover.detailHover(inside)
+                    }
+                } else if !data.gatewayAccounts.isEmpty {
+                    GatewayAccountsDetail(accounts: data.gatewayAccounts) { inside in
                         modelHover.detailHover(inside)
                     }
                 } else if data.showsResetExpiries {
