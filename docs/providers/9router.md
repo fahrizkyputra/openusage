@@ -21,9 +21,10 @@ added ("Account 1 (claude)"). Model-specific windows and credit balances are lef
 Connections that report no plan quota (plain API keys, custom endpoints) only count toward spend.
 
 Hover the **Accounts** value to see every active connection: its name and provider, Session and
-Weekly %, cost over the last 30 days, and a status — OK, Rate limited, No balance, Auth error, or
-Error — from 9router's last error within the past day (older errors count as recovered; the raw
-error text is never shown). Accounts with a plan quota are listed tightest first, the rest by cost.
+Weekly %, cost over the last 30 days, and its routing state in 9router: **OK**; **Cooling down** (9router
+skips one model on it for a short while); **Paused** (9router stopped routing to it after an error —
+its plan quota is unaffected; test the connection in the 9router dashboard to resume it); **No
+balance**; or **Auth error**. The raw error text is never shown. Accounts with a plan quota are listed tightest first, the rest by cost.
 
 Cost is what 9router prices each request at (API rates), so it's marked as an estimate: on a
 subscription it's API-equivalent value, not your bill. Days follow 9router's own clock. Hovering

@@ -19,7 +19,7 @@ struct GatewayAccountsDetail: View {
                     row(account)
                 }
             }
-            PopoverSourceNote(text: "Session / Weekly from each account's plan · cost over the last 30 days")
+            PopoverSourceNote(text: footnote)
         }
         .padding(14)
         .frame(width: Self.width)
@@ -55,7 +55,7 @@ struct GatewayAccountsDetail: View {
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
-                statusLabel(account.status)
+                statusLabel(account)
             }
             .font(.system(size: density.supportingPointSize))
 
@@ -77,6 +77,19 @@ struct GatewayAccountsDetail: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// Explains every non-OK state on screen once, so a paused account is never read as "quota used up".
+    private var footnote: String {
+        var parts = ["Session / Weekly from each account's plan · cost over the last 30 days"]
+        let states = Set(accounts.map(\.status))
+        if states.contains(.paused) {
+            parts.append("Paused: 9router stopped routing to it after an error; plan quota is unaffected. Test the connection in the 9router dashboard to resume.")
+        }
+        if states.contains(.coolingDown) {
+            parts.append("Cooling down: 9router skips one model on it for a short while.")
+        }
+        return parts.joined(separator: "\n")
+    }
+
     private func windowsText(_ account: GatewayAccount) -> String {
         func percent(_ value: Double?) -> String { value.map { "\(Int($0.rounded()))%" } ?? "—" }
         guard account.sessionPercent != nil || account.weeklyPercent != nil else { return "No plan quota" }
@@ -84,16 +97,17 @@ struct GatewayAccountsDetail: View {
     }
 
     @ViewBuilder
-    private func statusLabel(_ status: GatewayAccount.Status) -> some View {
-        if status.isProblem {
+    private func statusLabel(_ account: GatewayAccount) -> some View {
+        if account.status.isProblem {
             HStack(spacing: 3) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: account.status == .coolingDown ? "clock" : "pause.circle.fill")
                     .font(.system(size: density.supportingPointSize - 2))
-                Text(status.label)
+                Text(account.status.label)
             }
             .foregroundStyle(Theme.notice)
+            .accessibilityHint(account.statusDetail ?? "")
         } else {
-            Text(status.label)
+            Text(account.status.label)
                 .foregroundStyle(.secondary)
         }
     }

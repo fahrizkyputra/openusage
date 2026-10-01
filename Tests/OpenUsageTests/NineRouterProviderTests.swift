@@ -383,12 +383,16 @@ final class NineRouterAccountsTests: XCTestCase {
         OpenUsageISO8601.string(from: now.addingTimeInterval(-hoursAgo * 3600))
     }
 
-    func testLocalAccountsCarryWindowsCostAndStatusTightestFirst() {
+    func testLocalAccountsCarryWindowsCostAndRoutingStateTightestFirst() {
+        // Account 2 hit one 429: 9router locked a model for 16 seconds, then left the connection
+        // `unavailable`. Its plan quota is almost untouched — the status must say "paused", not
+        // anything that reads like a used-up limit.
         let connections = #"""
         {"connections":[
           {"id":"a","provider":"claude","name":"personal 5 max","isActive":true,"testStatus":"active"},
-          {"id":"b","provider":"claude","name":"Account 2","isActive":true,"errorCode":429,"lastErrorAt":"\#(iso(1))","lastError":"[429] secret"},
-          {"id":"c","provider":"deepseek","name":"localkey","isActive":true,"errorCode":402,"lastErrorAt":"\#(iso(48))"},
+          {"id":"b","provider":"claude","name":"Account 2","isActive":true,"testStatus":"unavailable","errorCode":429,"lastErrorAt":"\#(iso(2))","modelLock_claude-opus-5-5":"\#(iso(1.99))","lastError":"[429] secret"},
+          {"id":"c","provider":"deepseek","name":"localkey","isActive":true,"testStatus":"unavailable","errorCode":402},
+          {"id":"e","provider":"glm","name":"GLM","isActive":true,"testStatus":"active","modelLock_glm-5":"\#(iso(-0.25))"},
           {"id":"d","provider":"openai-compatible-chat-886bd6e6","name":"off","isActive":false}
         ]}
         """#
@@ -403,21 +407,38 @@ final class NineRouterAccountsTests: XCTestCase {
             connections: Data(connections.utf8), usageByID: usage, stats30: stats, now: now
         )
 
-        XCTAssertEqual(accounts.map(\.id), ["b", "a", "c"], "90% weekly first, then 34%, then quota-less")
-        XCTAssertEqual(accounts[0].status, .rateLimited)
-        XCTAssertEqual(accounts[1].cost30dUSD, 15)
-        XCTAssertEqual(accounts[1].sessionPercent, 34)
-        XCTAssertNil(accounts[2].tightestPercent)
-        XCTAssertEqual(accounts[2].status, .ok, "a 2-day-old error counts as recovered")
-        XCTAssertEqual(GatewayAccount.summary(accounts), "3 active · 1 limited")
+        // Quota-less accounts at equal cost fall back to name order: "GLM" before "localkey".
+        XCTAssertEqual(accounts.map(\.id), ["b", "a", "e", "c"], "90% weekly first, then 34%, then quota-less")
+        let byID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+        XCTAssertEqual(byID["b"]?.status, .paused, "expired lock + unavailable = paused")
+        XCTAssertEqual(byID["b"]?.errorCode, 429)
+        XCTAssertEqual(byID["a"]?.status, .ok)
+        XCTAssertEqual(byID["a"]?.cost30dUSD, 15)
+        XCTAssertEqual(byID["c"]?.status, .noBalance)
+        XCTAssertEqual(byID["e"]?.status, .coolingDown, "an unexpired lock is a short cooldown")
+        XCTAssertNotNil(byID["e"]?.until)
+        XCTAssertEqual(GatewayAccount.summary(accounts), "4 active · 3 need attention")
+        XCTAssertTrue(byID["b"]?.statusDetail?.contains("plan quota is unaffected") == true)
+    }
+
+    func testSummaryNamesASingleKindOfProblem() {
+        func account(_ status: GatewayAccount.Status) -> GatewayAccount {
+            GatewayAccount(id: UUID().uuidString, name: "x", provider: nil, sessionPercent: nil,
+                           weeklyPercent: nil, cost30dUSD: 0, status: status)
+        }
+        XCTAssertEqual(GatewayAccount.summary([account(.ok), account(.paused)]), "2 active · 1 paused")
+        XCTAssertEqual(GatewayAccount.summary([account(.ok), account(.ok)]), "2 active")
     }
 
     func testProxyAccountsParseAndReorder() throws {
-        let body = #"{"accounts":[{"id":"x","name":"","provider":"glm","sessionPercent":null,"weeklyPercent":null,"cost30dUSD":3,"status":"no_balance"},{"id":"y","name":"AI-TECH 2","provider":"claude","sessionPercent":39,"weeklyPercent":81,"cost30dUSD":100,"status":"ok"}]}"#
+        let body = #"{"accounts":[{"id":"x","name":"","provider":"glm","sessionPercent":null,"weeklyPercent":null,"cost30dUSD":3,"status":"no_balance"},{"id":"y","name":"AI-TECH 2","provider":"claude","sessionPercent":39,"weeklyPercent":81,"cost30dUSD":100,"status":"paused","errorCode":429},{"id":"z","name":"old proxy","provider":"claude","cost30dUSD":1,"status":"rate_limited"}]}"#
         let accounts = try XCTUnwrap(NineRouterUsageMapper.proxyAccounts(Data(body.utf8)))
-        XCTAssertEqual(accounts.map(\.id), ["y", "x"])
+        XCTAssertEqual(accounts.map(\.id), ["y", "x", "z"])
+        XCTAssertEqual(accounts[0].status, .paused)
+        XCTAssertEqual(accounts[0].errorCode, 429)
         XCTAssertEqual(accounts[1].name, "glm", "an empty name falls back to the provider")
         XCTAssertEqual(accounts[1].status, .noBalance)
+        XCTAssertEqual(accounts[2].status, .paused, "an older proxy's 'rate_limited' reads as paused")
         XCTAssertNil(NineRouterUsageMapper.proxyAccounts(Data("{}".utf8)))
     }
 

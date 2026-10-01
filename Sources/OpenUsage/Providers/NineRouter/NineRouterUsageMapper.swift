@@ -120,19 +120,23 @@ enum NineRouterUsageMapper {
 
     // MARK: - Accounts
 
-    /// A connection's health from 9router's `testStatus` + last `errorCode`. Errors older than a day
-    /// count as recovered. Mirrors kitchen-usage-proxy's `accountStatus`.
-    static func accountStatus(_ connection: [String: Any], now: Date) -> GatewayAccount.Status {
-        let at = (connection["lastErrorAt"] as? String).flatMap(OpenUsageISO8601.date(from:))
-        let recent = at.map { now.timeIntervalSince($0) <= 24 * 60 * 60 } ?? false
-        guard recent, let code = ProviderParse.number(connection["errorCode"]).map(Int.init) else {
-            return .ok
-        }
+    /// A connection's routing state in 9router: an unexpired `modelLock_*` is cooling down; a
+    /// connection 9router marked `unavailable`/`error` is paused (or no balance / auth error by its last
+    /// code); otherwise OK. Mirrors kitchen-usage-proxy's `accountStatus`.
+    static func accountStatus(_ connection: [String: Any], now: Date)
+        -> (status: GatewayAccount.Status, until: Date?, errorCode: Int?) {
+        let lockEnds = connection
+            .filter { $0.key.hasPrefix("modelLock_") }
+            .compactMap { ($0.value as? String).flatMap(OpenUsageISO8601.date(from:)) }
+            .filter { $0 > now }
+        if let until = lockEnds.max() { return (.coolingDown, until, nil) }
+        let test = connection["testStatus"] as? String
+        guard test == "unavailable" || test == "error" else { return (.ok, nil, nil) }
+        let code = ProviderParse.number(connection["errorCode"]).map(Int.init)
         switch code {
-        case 429: return .rateLimited
-        case 402: return .noBalance
-        case 401, 403: return .authError
-        default: return .error
+        case 402: return (.noBalance, nil, nil)
+        case 401, 403: return (.authError, nil, nil)
+        default: return (.paused, nil, code)
         }
     }
 
@@ -158,6 +162,7 @@ enum NineRouterUsageMapper {
             guard (connection["isActive"] as? Bool) != false, let id = connection["id"] as? String,
                   let name = names[id] else { return nil }
             let windows = usageByID[id].map { quotas($0) } ?? []
+            let state = accountStatus(connection, now: now)
             return GatewayAccount(
                 id: id,
                 name: name,
@@ -165,7 +170,9 @@ enum NineRouterUsageMapper {
                 sessionPercent: windows.filter { $0.window == .session }.map(\.percent).max(),
                 weeklyPercent: windows.filter { $0.window == .weekly }.map(\.percent).max(),
                 cost30dUSD: max(0, costByID[id] ?? 0),
-                status: accountStatus(connection, now: now)
+                status: state.status,
+                until: state.until,
+                errorCode: state.errorCode
             )
         }
         return GatewayAccount.ordered(accounts)
@@ -185,7 +192,11 @@ enum NineRouterUsageMapper {
                 sessionPercent: ProviderParse.number(entry["sessionPercent"]).map(ProviderParse.clampPercent),
                 weeklyPercent: ProviderParse.number(entry["weeklyPercent"]).map(ProviderParse.clampPercent),
                 cost30dUSD: max(0, ProviderParse.number(entry["cost30dUSD"]) ?? 0),
-                status: (entry["status"] as? String).flatMap(GatewayAccount.Status.init(rawValue:)) ?? .error
+                // An older proxy's labels (`rate_limited`, `error`) predate the routing states; read
+                // them as paused so they never claim quota is used up.
+                status: (entry["status"] as? String).flatMap(GatewayAccount.Status.init(rawValue:)) ?? .paused,
+                until: (entry["until"] as? String).flatMap(OpenUsageISO8601.date(from:)),
+                errorCode: ProviderParse.number(entry["errorCode"]).map(Int.init)
             )
         }
         return GatewayAccount.ordered(accounts)
