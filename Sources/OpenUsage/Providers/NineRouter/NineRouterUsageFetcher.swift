@@ -68,13 +68,14 @@ struct NineRouterUsageFetcher: Sendable {
             return (legacy.lines, legacy.sources, [])
         }
         let quotas = accounts.flatMap { account -> [NineRouterUsageMapper.Quota] in
-            [(NineRouterUsageMapper.Window.session, account.sessionPercent),
-             (NineRouterUsageMapper.Window.weekly, account.weeklyPercent)].compactMap { window, percent in
-                percent.map { NineRouterUsageMapper.Quota(window: window, percent: $0, resetsAt: nil, source: account.name) }
-            }
+            [(NineRouterUsageMapper.Window.session, account.sessionPercent, account.sessionResetsAt),
+             (NineRouterUsageMapper.Window.weekly, account.weeklyPercent, account.weeklyResetsAt)]
+                .compactMap { window, percent, reset in
+                    percent.map { NineRouterUsageMapper.Quota(window: window, percent: $0, resetsAt: reset, source: account.name) }
+                }
         }
-        // Reset times aren't part of the account list: take them from the per-connection quota of the
-        // two winning accounts only.
+        // The proxy reports each window's reset time; an older one doesn't, so fill any missing reset
+        // from the per-connection quota of the winning accounts only.
         let tightest = await withResetTimes(NineRouterUsageMapper.tightestQuotas(quotas), accounts: accounts, auth: auth)
         let lines = tightest.lines + [NineRouterUsageMapper.accountsLine(accounts)].compactMap { $0 }
         return (lines, tightest.sources, accounts)
@@ -87,7 +88,11 @@ struct NineRouterUsageFetcher: Sendable {
         auth: NineRouterAuth
     ) async -> (lines: [MetricLine], sources: [String: String]) {
         var resets: [String: Date] = [:]
-        for (label, name) in tightest.sources {
+        let missing = Set(tightest.lines.compactMap { line -> String? in
+            guard case .progress(let label, _, _, _, let reset, _, _) = line, reset == nil else { return nil }
+            return label
+        })
+        for (label, name) in tightest.sources where missing.contains(label) {
             guard let id = accounts.first(where: { $0.name == name })?.id,
                   case .success(let body) = await load({ try await usageClient.fetchConnectionUsage(connectionID: id, auth: auth) })
             else { continue }

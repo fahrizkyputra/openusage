@@ -28,6 +28,8 @@ private func response(_ json: String, status: Int = 200) -> HTTPResponse {
 private final class FakeKitchenProxy: @unchecked Sendable {
     var validKey = "sk-team-key"
     var paths: [String] = []
+    /// `/v1/accounts` body; defaults to an older proxy's (no per-window reset times).
+    var accountsBody = accountsJSON
 
     func handle(_ request: HTTPRequest) -> HTTPResponse {
         XCTAssertEqual(request.url.host, "kitchen.example.com")
@@ -42,7 +44,7 @@ private final class FakeKitchenProxy: @unchecked Sendable {
             XCTAssertEqual(request.url.query, "days=30")
             return response(dailyJSON)
         case "/openusage/v1/connections": return response(connectionsJSON)
-        case "/openusage/v1/accounts": return response(accountsJSON)
+        case "/openusage/v1/accounts": return response(accountsBody)
         case "/openusage/v1/connections/k1/usage": return response(quotaJSON)
         default: return response(#"{"error":"not_found"}"#, status: 404)
         }
@@ -172,6 +174,22 @@ final class NineRouterKitchenProviderTests: XCTestCase {
             "/openusage/v1/daily", "/openusage/v1/accounts", "/openusage/v1/connections/k1/usage"
         ], "one accounts call + the winning connection's resets, not one call per connection")
         XCTAssertFalse(proxy.paths.contains { $0.hasPrefix("/api/") }, "must never call 9router admin routes")
+    }
+
+    func testProxyResetTimesSkipThePerConnectionCall() async {
+        let proxy = FakeKitchenProxy()
+        proxy.accountsBody = #"{"accounts":[{"id":"k1","name":"Kitchen 1","provider":"claude","sessionPercent":40,"weeklyPercent":20,"sessionResetAt":"2026-09-30T14:00:00Z","weeklyResetAt":"2026-10-03T00:00:00Z","cost30dUSD":12,"status":"ok"}]}"#
+        let provider = makeProvider(proxy: proxy, key: "sk-team-key")
+
+        let snapshot = await provider.refresh()
+
+        guard case .progress(_, _, _, _, let sessionReset, _, _) = snapshot.line(label: "Session") else {
+            return XCTFail("session meter")
+        }
+        XCTAssertEqual(sessionReset, OpenUsageISO8601.date(from: "2026-09-30T14:00:00Z"))
+        XCTAssertEqual(snapshot.accounts?.first?.weeklyResetsAt, OpenUsageISO8601.date(from: "2026-10-03T00:00:00Z"))
+        XCTAssertEqual(Set(proxy.paths), ["/openusage/v1/daily", "/openusage/v1/accounts"],
+                       "reset times come with the account list")
     }
 
     func testRejectedKeyReportsInvalidKey() async {
