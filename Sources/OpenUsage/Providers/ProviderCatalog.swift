@@ -62,6 +62,7 @@ enum ProviderCatalog {
             NineRouterProvider(),
             NineRouterKitchenProvider(),
             AntigravityProvider(),
+            CommandCodeProvider(),
             CopilotProvider(defaults: defaults),
             DevinProvider(),
             GrokProvider(),

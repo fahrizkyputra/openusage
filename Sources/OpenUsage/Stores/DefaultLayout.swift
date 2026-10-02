@@ -32,6 +32,9 @@ enum DefaultLayout {
         "claude.session", "claude.weekly", "claude.fable", "claude.trend",
         "claude.extra", "claude.rateLimitResets", "claude.today", "claude.yesterday", "claude.last30",
 
+        "commandcode.fiveHour", "commandcode.weekly", "commandcode.monthly",
+        "commandcode.extra", "commandcode.requests", "commandcode.today", "commandcode.yesterday",
+
         "codex.session", "codex.weekly", "codex.spark", "codex.sparkWeekly", "codex.trend",
         "codex.credits", "codex.rateLimitResets", "codex.today", "codex.yesterday", "codex.last30",
 
@@ -86,6 +89,7 @@ enum DefaultLayout {
         "antigravity.geminiPro", "antigravity.geminiWeekly",
         "claude.session", "claude.weekly",
         "codex.session", "codex.weekly",
+        "commandcode.fiveHour", "commandcode.weekly",
         "cursor.auto", "cursor.api",
         "copilot.premium",
         "ollama.session", "ollama.weekly",
@@ -133,6 +137,9 @@ enum DefaultLayout {
         // sit below the caret.
         "openrouter.today", "openrouter.week", "openrouter.month", "openrouter.keyLimit",
         // Z.ai: Session meter stays above the fold; Web Searches (monthly count) sits below the caret.
-        "zai.webSearches"
+        "zai.webSearches",
+        // Command Code: 5-hour, Weekly, and Monthly stay above the fold; balances, requests, and
+        // spend sit below the caret.
+        "commandcode.extra", "commandcode.requests", "commandcode.today", "commandcode.yesterday"
     ]
 }

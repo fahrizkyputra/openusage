@@ -208,6 +208,7 @@ final class LocalLimitsAPITests: XCTestCase {
             "9router-kitchen": ["session", "weekly"],
             "claude": ["session", "weekly", "sonnet", "fable", "extraUsage", "rateLimitResets"],
             "codex": ["session", "weekly", "spark", "sparkWeekly", "credits", "creditValue", "rateLimitResets"],
+            "commandcode": ["fiveHour", "weekly", "monthly"],
             "cursor": ["totalUsage", "grokBot", "autoUsage", "apiUsage", "onDemand", "requests", "credits"],
             "antigravity": ["geminiSession", "geminiWeekly", "nonGeminiSession", "nonGeminiWeekly"],
             "copilot": ["premiumCredits", "extraUsage", "orgCredits", "orgSpend", "chat", "completions"],
