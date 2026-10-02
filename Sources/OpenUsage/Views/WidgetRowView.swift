@@ -377,9 +377,12 @@ struct WidgetRowView: View {
                         modelHover.detailHover(inside)
                     }
                 } else if !data.gatewayAccounts.isEmpty {
-                    GatewayAccountsDetail(accounts: data.gatewayAccounts) { inside in
-                        modelHover.detailHover(inside)
-                    }
+                    GatewayAccountsDetail(
+                        row: data,
+                        onToggleMeterStyle: onToggleMeterStyle,
+                        onToggleResetDisplay: onToggleResetDisplay,
+                        onHoverChange: { inside in modelHover.detailHover(inside) }
+                    )
                 } else if data.showsResetExpiries {
                     RateLimitResetsDetail(
                         count: data.resetCreditCount, expiries: data.expiriesAt,

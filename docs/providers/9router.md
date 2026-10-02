@@ -9,7 +9,7 @@ proxy that rotates your AI coding requests across several upstream accounts.
 |---|---|
 | Session | The tightest 5-hour window across every active upstream connection |
 | Weekly | The tightest weekly window across every active upstream connection |
-| Accounts | How many upstream accounts are active, and how many are limited ("4 active · 1 limited"). Hover for the list |
+| Accounts | How many upstream accounts are active, and how many need attention ("4 active · 1 paused"). Hover for the list |
 | Usage Trend | Tokens per day over the last 30 days |
 | Today / Yesterday / Last 30 Days | Cost and tokens routed through 9router; they also feed [Total Spend](../dashboard.md#total-spend) |
 
@@ -20,11 +20,15 @@ connection's label in the 9router dashboard; when two active connections share a
 added ("Account 1 (claude)"). Model-specific windows and credit balances are left out.
 Connections that report no plan quota (plain API keys, custom endpoints) only count toward spend.
 
-Hover the **Accounts** value to see every active connection: its name and provider, Session and
-Weekly %, cost over the last 30 days, and its routing state in 9router: **OK**; **Cooling down** (9router
-skips one model on it for a short while); **Paused** (9router stopped routing to it after an error —
-its plan quota is unaffected; test the connection in the 9router dashboard to resume it); **No
-balance**; or **Auth error**. The raw error text is never shown. Accounts with a plan quota are listed tightest first, the rest by cost.
+Hover the **Accounts** value to see every active connection: its name, provider, and cost over the last
+30 days, with its own **Session** and **Weekly** bars. The bars read exactly like the card's Session /
+Weekly rows: same Used/Left direction, reset time format, and pace colors, and clicking a reading
+flips the same setting. Accounts without a plan quota show "No plan quota". A badge appears under the
+name only when 9router isn't routing to the account normally: **Cooling down** (9router skips one model
+on it for a short while); **Paused** (9router stopped routing to it after an error — its plan quota is
+unaffected; test the connection in the 9router dashboard to resume it); **No balance**; or **Auth
+error**. The raw error text is never shown. Accounts with a plan quota are listed tightest first, the
+rest by cost.
 
 Cost is what 9router prices each request at (API rates), so it's marked as an estimate: on a
 subscription it's API-equivalent value, not your bill. Days follow 9router's own clock. Hovering

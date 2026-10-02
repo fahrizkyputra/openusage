@@ -431,15 +431,52 @@ final class NineRouterAccountsTests: XCTestCase {
     }
 
     func testProxyAccountsParseAndReorder() throws {
-        let body = #"{"accounts":[{"id":"x","name":"","provider":"glm","sessionPercent":null,"weeklyPercent":null,"cost30dUSD":3,"status":"no_balance"},{"id":"y","name":"AI-TECH 2","provider":"claude","sessionPercent":39,"weeklyPercent":81,"cost30dUSD":100,"status":"paused","errorCode":429},{"id":"z","name":"old proxy","provider":"claude","cost30dUSD":1,"status":"rate_limited"}]}"#
+        let body = #"{"accounts":[{"id":"x","name":"","provider":"glm","sessionPercent":null,"weeklyPercent":null,"cost30dUSD":3,"status":"no_balance"},{"id":"y","name":"AI-TECH 2","provider":"claude","sessionPercent":39,"weeklyPercent":81,"sessionResetAt":"2027-01-15T10:00:00Z","weeklyResetAt":"bad","cost30dUSD":100,"status":"paused","errorCode":429},{"id":"z","name":"old proxy","provider":"claude","cost30dUSD":1,"status":"rate_limited"}]}"#
         let accounts = try XCTUnwrap(NineRouterUsageMapper.proxyAccounts(Data(body.utf8)))
         XCTAssertEqual(accounts.map(\.id), ["y", "x", "z"])
         XCTAssertEqual(accounts[0].status, .paused)
         XCTAssertEqual(accounts[0].errorCode, 429)
+        XCTAssertEqual(accounts[0].sessionResetsAt, OpenUsageISO8601.date(from: "2027-01-15T10:00:00Z"))
+        XCTAssertNil(accounts[0].weeklyResetsAt, "an unparseable reset time is dropped")
         XCTAssertEqual(accounts[1].name, "glm", "an empty name falls back to the provider")
         XCTAssertEqual(accounts[1].status, .noBalance)
         XCTAssertEqual(accounts[2].status, .paused, "an older proxy's 'rate_limited' reads as paused")
         XCTAssertNil(NineRouterUsageMapper.proxyAccounts(Data("{}".utf8)))
+    }
+
+    func testLocalAccountsCarryEachWindowsResetTime() {
+        let connections = #"{"connections":[{"id":"a","provider":"claude","name":"A","isActive":true,"testStatus":"active"}]}"#
+        let usage = ["a": Data(#"{"quotas":{"session (5h)":{"used":40,"total":100,"resetAt":"2027-01-15T10:00:00Z"},"weekly (7d)":{"used":5,"total":100,"resetAt":"2027-01-20T02:00:00Z"}}}"#.utf8)]
+        let account = try? XCTUnwrap(NineRouterUsageMapper.localAccounts(
+            connections: Data(connections.utf8), usageByID: usage, stats30: nil, now: now
+        ).first)
+        XCTAssertEqual(account?.sessionResetsAt, OpenUsageISO8601.date(from: "2027-01-15T10:00:00Z"))
+        XCTAssertEqual(account?.weeklyResetsAt, OpenUsageISO8601.date(from: "2027-01-20T02:00:00Z"))
+    }
+
+    /// The panel's per-account bars must read like the card's Session / Weekly rows: same Used/Left
+    /// direction, reset format, and pace window, all taken from the card row's settings.
+    func testMeterDataFollowsTheCardRowsDisplaySettings() throws {
+        let account = GatewayAccount(id: "a", name: "A", provider: "claude", sessionPercent: 8, weeklyPercent: nil,
+                                     sessionResetsAt: now.addingTimeInterval(3600), cost30dUSD: 0, status: .paused)
+        var card = WidgetData(title: "Accounts", icon: .providerMark("9router"), kind: .count, used: 0, limit: nil)
+        card.displayMode = .remaining
+        card.resetDisplayMode = .absolute
+        card.alwaysShowPacing = true
+
+        let session = try XCTUnwrap(account.meterData(.session, like: card))
+        XCTAssertEqual(session.headline, "92% left", "remaining mode: the bar shrinks as quota is used")
+        XCTAssertEqual(session.fraction, 0.92, accuracy: 0.001)
+        XCTAssertEqual(session.resetDisplayMode, .absolute)
+        XCTAssertTrue(session.alwaysShowPacing)
+        XCTAssertEqual(session.periodDurationMs, NineRouterUsageMapper.sessionPeriodMs)
+        XCTAssertEqual(session.resetsAt, now.addingTimeInterval(3600))
+        XCTAssertNil(account.meterData(.weekly, like: card), "no weekly window, no weekly bar")
+
+        card.displayMode = .used
+        let used = try XCTUnwrap(account.meterData(.session, like: card))
+        XCTAssertEqual(used.headline, "8% used")
+        XCTAssertEqual(used.fraction, 0.08, accuracy: 0.001)
     }
 
     func testAccountsLineReadsTheSummary() {

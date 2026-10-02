@@ -36,6 +36,9 @@ struct GatewayAccount: Hashable, Sendable, Codable {
     var provider: String?
     var sessionPercent: Double?
     var weeklyPercent: Double?
+    /// When each plan window resets, if the gateway reported it.
+    var sessionResetsAt: Date? = nil
+    var weeklyResetsAt: Date? = nil
     var cost30dUSD: Double
     var status: Status
     /// End of the running model lock (`coolingDown` only).
@@ -89,5 +92,36 @@ struct GatewayAccount: Hashable, Sendable, Codable {
         let kinds = Set(problems.map(\.status))
         let word = kinds.count == 1 ? kinds.first!.label.lowercased() : "need attention"
         return "\(base) · \(problems.count) \(word)"
+    }
+}
+
+// MARK: - Plan-window meters
+
+extension GatewayAccount {
+    /// The two plan windows an account can report, matching the card's Session / Weekly rows.
+    enum Window: CaseIterable {
+        case session
+        case weekly
+
+        var label: String { self == .session ? "Session" : "Weekly" }
+        var periodDurationMs: Int {
+            self == .session ? NineRouterUsageMapper.sessionPeriodMs : NineRouterUsageMapper.weeklyPeriodMs
+        }
+    }
+
+    /// A meter for one of this account's plan windows, rendered exactly like the card's Session / Weekly
+    /// rows: the same Used/Left mode, reset format, pacing opt-in, and pace colors, all taken from
+    /// `template` (the card's Accounts row, which `WidgetDataStore` stamps with the global settings).
+    /// Nil when the account doesn't report that window.
+    func meterData(_ window: Window, like template: WidgetData) -> WidgetData? {
+        guard let percent = window == .session ? sessionPercent : weeklyPercent else { return nil }
+        var data = WidgetData(title: window.label, icon: template.icon, kind: .percent,
+                              used: ProviderParse.clampPercent(percent), limit: 100)
+        data.resetsAt = window == .session ? sessionResetsAt : weeklyResetsAt
+        data.periodDurationMs = window.periodDurationMs
+        data.displayMode = template.displayMode
+        data.resetDisplayMode = template.resetDisplayMode
+        data.alwaysShowPacing = template.alwaysShowPacing
+        return data
     }
 }

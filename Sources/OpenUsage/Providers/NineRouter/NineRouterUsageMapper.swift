@@ -163,12 +163,16 @@ enum NineRouterUsageMapper {
                   let name = names[id] else { return nil }
             let windows = usageByID[id].map { quotas($0) } ?? []
             let state = accountStatus(connection, now: now)
+            let session = windows.filter { $0.window == .session }.max { $0.percent < $1.percent }
+            let weekly = windows.filter { $0.window == .weekly }.max { $0.percent < $1.percent }
             return GatewayAccount(
                 id: id,
                 name: name,
                 provider: connection["provider"] as? String,
-                sessionPercent: windows.filter { $0.window == .session }.map(\.percent).max(),
-                weeklyPercent: windows.filter { $0.window == .weekly }.map(\.percent).max(),
+                sessionPercent: session?.percent,
+                weeklyPercent: weekly?.percent,
+                sessionResetsAt: session?.resetsAt,
+                weeklyResetsAt: weekly?.resetsAt,
                 cost30dUSD: max(0, costByID[id] ?? 0),
                 status: state.status,
                 until: state.until,
@@ -191,6 +195,8 @@ enum NineRouterUsageMapper {
                 provider: provider,
                 sessionPercent: ProviderParse.number(entry["sessionPercent"]).map(ProviderParse.clampPercent),
                 weeklyPercent: ProviderParse.number(entry["weeklyPercent"]).map(ProviderParse.clampPercent),
+                sessionResetsAt: (entry["sessionResetAt"] as? String).flatMap(OpenUsageISO8601.date(from:)),
+                weeklyResetsAt: (entry["weeklyResetAt"] as? String).flatMap(OpenUsageISO8601.date(from:)),
                 cost30dUSD: max(0, ProviderParse.number(entry["cost30dUSD"]) ?? 0),
                 // An older proxy's labels (`rate_limited`, `error`) predate the routing states; read
                 // them as paused so they never claim quota is used up.
@@ -202,7 +208,7 @@ enum NineRouterUsageMapper {
         return GatewayAccount.ordered(accounts)
     }
 
-    /// The card's "Accounts" row: "4 active · 1 limited".
+    /// The card's "Accounts" row: "4 active · 1 paused".
     static func accountsLine(_ accounts: [GatewayAccount]) -> MetricLine? {
         guard !accounts.isEmpty else { return nil }
         return .badge(label: GatewayAccount.lineLabel, text: GatewayAccount.summary(accounts))
