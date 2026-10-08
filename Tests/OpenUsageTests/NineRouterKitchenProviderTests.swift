@@ -192,6 +192,77 @@ final class NineRouterKitchenProviderTests: XCTestCase {
                        "reset times come with the account list")
     }
 
+    func testKitchenSessionAndWeeklyComeFromRoutableAccountWithLeastSessionLeft() async {
+        let (snapshot, proxy) = await refresh(accounts: #"""
+        {"accounts":[
+          {"id":"a","name":"Account A","provider":"claude","sessionPercent":40,"weeklyPercent":70,"sessionResetAt":"2026-09-30T16:00:00Z","weeklyResetAt":"2026-10-03T00:00:00Z","cost30dUSD":0,"status":"ok"},
+          {"id":"b","name":"Account B","provider":"claude","sessionPercent":92,"weeklyPercent":10,"sessionResetAt":"2026-09-30T14:00:00Z","weeklyResetAt":"2026-10-04T00:00:00Z","cost30dUSD":0,"status":"cooling_down"},
+          {"id":"c","name":"Paused","provider":"claude","sessionPercent":99,"weeklyPercent":95,"sessionResetAt":"2026-09-30T13:00:00Z","weeklyResetAt":"2026-10-02T00:00:00Z","cost30dUSD":0,"status":"paused","errorCode":429}
+        ]}
+        """#)
+
+        guard case .progress(_, let sessionUsed, _, _, _, _, _) = snapshot.line(label: "Session"),
+              case .progress(_, let weeklyUsed, _, _, _, _, _) = snapshot.line(label: "Weekly") else {
+            return XCTFail("both meters should use the selected account")
+        }
+        XCTAssertEqual(sessionUsed, 92)
+        XCTAssertEqual(weeklyUsed, 10, "Weekly comes from Account B, not the separate weekly maximum")
+        XCTAssertEqual(snapshot.lineSources, ["Session": "Account B", "Weekly": "Account B"])
+        XCTAssertEqual(Set(proxy.paths), ["/openusage/v1/daily", "/openusage/v1/accounts"])
+    }
+
+    func testWhenEveryRoutableSessionIsExhaustedChooseTheSoonestResetAccount() async {
+        let snapshot = await refresh(accounts: #"""
+        {"accounts":[
+          {"id":"a","name":"Later reset","provider":"claude","sessionPercent":100,"weeklyPercent":15,"sessionResetAt":"2026-09-30T13:00:00Z","weeklyResetAt":"2026-10-03T00:00:00Z","cost30dUSD":0,"status":"ok"},
+          {"id":"b","name":"Sooner reset","provider":"claude","sessionPercent":100,"weeklyPercent":80,"sessionResetAt":"2026-09-30T12:30:00Z","weeklyResetAt":"2026-10-04T00:00:00Z","cost30dUSD":0,"status":"ok"}
+        ]}
+        """#).0
+
+        guard case .progress(_, let sessionUsed, _, _, _, _, _) = snapshot.line(label: "Session"),
+              case .progress(_, let weeklyUsed, _, _, _, _, _) = snapshot.line(label: "Weekly") else {
+            return XCTFail("exhausted meters should remain visible")
+        }
+        XCTAssertEqual(sessionUsed, 100)
+        XCTAssertEqual(weeklyUsed, 80, "both bars follow the account whose Session resets first")
+        XCTAssertEqual(snapshot.lineSources, ["Session": "Sooner reset", "Weekly": "Sooner reset"])
+    }
+
+    func testKitchenHidesBothQuotaMetersWhenNoRoutableSessionAccountExists() async {
+        let snapshot = await refresh(accounts: #"""
+        {"accounts":[
+          {"id":"a","name":"Paused","provider":"claude","sessionPercent":90,"weeklyPercent":40,"status":"paused"},
+          {"id":"b","name":"No balance","provider":"claude","sessionPercent":20,"weeklyPercent":10,"status":"no_balance"}
+        ]}
+        """#).0
+
+        XCTAssertNil(snapshot.line(label: "Session"))
+        XCTAssertNil(snapshot.line(label: "Weekly"))
+        XCTAssertNotNil(snapshot.line(label: "Accounts"), "the all-account popup row remains visible")
+    }
+
+    func testKitchenDoesNotBorrowWeeklyFromAnotherAccount() async {
+        let snapshot = await refresh(accounts: #"""
+        {"accounts":[
+          {"id":"a","name":"Session winner","provider":"claude","sessionPercent":95,"weeklyPercent":null,"sessionResetAt":"2026-09-30T14:00:00Z","status":"ok"},
+          {"id":"b","name":"Weekly winner","provider":"claude","sessionPercent":80,"weeklyPercent":90,"sessionResetAt":"2026-09-30T15:00:00Z","weeklyResetAt":"2026-10-04T00:00:00Z","status":"ok"}
+        ]}
+        """#).0
+
+        guard case .progress(_, let sessionUsed, _, _, _, _, _) = snapshot.line(label: "Session") else {
+            return XCTFail("session meter")
+        }
+        XCTAssertEqual(sessionUsed, 95)
+        XCTAssertNil(snapshot.line(label: "Weekly"), "weekly is missing on the selected account")
+        XCTAssertEqual(snapshot.lineSources, ["Session": "Session winner"])
+    }
+
+    private func refresh(accounts: String) async -> (ProviderSnapshot, FakeKitchenProxy) {
+        let proxy = FakeKitchenProxy()
+        proxy.accountsBody = accounts
+        return (await makeProvider(proxy: proxy).refresh(), proxy)
+    }
+
     func testRejectedKeyReportsInvalidKey() async {
         let proxy = FakeKitchenProxy()
         let provider = makeProvider(proxy: proxy, key: "sk-wrong")
