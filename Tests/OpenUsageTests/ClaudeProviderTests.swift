@@ -380,7 +380,7 @@ final class ClaudeProviderTests: XCTestCase {
             (
                 name: "out-of-window usage",
                 line: ClaudeLogFixture.usageLine(
-                    timestamp: "2025-12-20T16:00:00.000Z", input: 100, output: 50, costUSD: 0.25
+                    timestamp: "2025-01-16T16:00:00.000Z", input: 100, output: 50, costUSD: 0.25
                 )
             ),
             (
@@ -401,6 +401,7 @@ final class ClaudeProviderTests: XCTestCase {
                     now: { now }
                 ),
                 logUsageScanner: ClaudeLogFixture.scanner(home: home),
+                allowsUnattributedPiUsage: false,
                 now: { now },
                 pricing: { TestPricing.bundled }
             )
@@ -670,6 +671,7 @@ final class ClaudeProviderTests: XCTestCase {
                 ),
                 usageClient: ClaudeUsageClient(httpClient: FakeHTTPClient(response: HTTPResponse(statusCode: 200, headers: [:], body: Data()))),
                 logUsageScanner: ClaudeLogFixture.scanner(home: nil),
+                allowsUnattributedPiUsage: false,
                 pricing: { TestPricing.bundled }
             )
         }

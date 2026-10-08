@@ -415,13 +415,13 @@ final class ClaudeLogUsageScannerTests: XCTestCase {
         let now = Date()
         let home = try ClaudeLogFixture.makeHome(files: [
             "project-a/old.jsonl": ClaudeLogFixture.usageLine(
-                timestamp: OpenUsageISO8601.string(from: now.addingTimeInterval(-90 * 86_400)),
+                timestamp: OpenUsageISO8601.string(from: now.addingTimeInterval(-400 * 86_400)),
                 input: 100, output: 50, costUSD: 0.25
             )
         ])
         let oldFile = home.appendingPathComponent("projects/project-a/old.jsonl")
         try FileManager.default.setAttributes(
-            [.modificationDate: now.addingTimeInterval(-90 * 86_400)], ofItemAtPath: oldFile.path
+            [.modificationDate: now.addingTimeInterval(-400 * 86_400)], ofItemAtPath: oldFile.path
         )
         let scanner = ClaudeLogFixture.scanner(home: home)
 

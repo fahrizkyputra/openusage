@@ -90,7 +90,7 @@ actor CodexLogUsageScanner {
     /// Scan the last `daysBack` days of Codex rollouts. Returns `nil` when no Codex home or no
     /// session files exist (the spend tiles then render "No data").
     func scan(
-        daysBack: Int = 30, now: Date = Date(), pricing: ModelPricing, fallbackModel: String? = nil
+        daysBack: Int = 365, now: Date = Date(), pricing: ModelPricing, fallbackModel: String? = nil
     ) async -> LogUsageScan? {
         // Codex rollouts identify conversations, not the account paying for each turn. xswap can
         // resume the same conversation under another login, so even its home cannot prove ownership.

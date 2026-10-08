@@ -102,7 +102,7 @@ actor ClaudeLogUsageScanner {
     /// Scan the last `daysBack` days of Claude logs. Returns `nil` when no Claude data directory or
     /// no log files exist (the spend tiles then render "No data"); returns an empty series when logs
     /// exist but have no usage in the window.
-    func scan(daysBack: Int = 30, now: Date = Date(), pricing: ModelPricing) async -> LogUsageScan? {
+    func scan(daysBack: Int = 365, now: Date = Date(), pricing: ModelPricing) async -> LogUsageScan? {
         // A UUID-only login cannot claim any organization's history once multiple identities are
         // known; while it is the default login it still claims the default home's unattributed sessions.
         let claimsDefaultHome = !allowsUnattributedSessions && isCurrentDefaultLogin()

@@ -27,7 +27,10 @@ actor PiUsageScanner {
 
     private static let sharedScanner = IncrementalJSONLScanner<Entry>(
         logTag: LogTag.plugin("pi"),
-        persistence: JSONLScanCachePersistence(namespace: "pi", schemaVersion: 1)
+        // v3: parse now keeps the raw pi provider id and maps at aggregation (see Entry), making the
+        // cache mapping-independent. v2 entries carry resolved card ids — undecodable under the new
+        // semantics — so one forced re-parse remains.
+        persistence: JSONLScanCachePersistence(namespace: "pi", schemaVersion: 3)
     )
 
     static func flushPersistentCacheWrites() async {
@@ -45,11 +48,13 @@ actor PiUsageScanner {
     }
 
     /// One parsed assistant-message usage line. Raw timestamp is kept so a cached parse stays valid as
-    /// the window slides; `cardID` is resolved at parse time so aggregation is a cheap filter.
+    /// the window slides; `piProvider` is pi's raw provider id — mapped to an OpenUsage card at
+    /// aggregation time, NEVER at parse time, so adding a card to `PiProviderMapping` can never
+    /// invalidate (poison) the persistent parse cache.
     struct Entry: Codable, Sendable, Equatable {
         var id: String?
         var timestamp: Date
-        var cardID: String
+        var piProvider: String
         var model: String
         /// pi's own `usage.cost.total`, used directly when > 0; nil/0 falls through to engine pricing.
         var carriedCost: Double?
@@ -62,7 +67,7 @@ actor PiUsageScanner {
     /// Scan the last `daysBack` days of pi logs for one card. Returns nil when pi's sessions directory
     /// has no log files at all, so a provider with no pi usage folds in nothing.
     func scan(
-        cardID: String, daysBack: Int = 30, now: Date = Date(), pricing: ModelPricing,
+        cardID: String, daysBack: Int = 365, now: Date = Date(), pricing: ModelPricing,
         estimateCost: CostEstimator? = nil
     ) async -> LogUsageScan? {
         let directory = PiPaths.sessionsDirectory(environment: environment, homeDirectory: homeDirectory())
@@ -109,8 +114,7 @@ actor PiUsageScanner {
               let timestamp = OpenUsageISO8601.date(from: timestampRaw),
               let message = object["message"] as? [String: Any],
               message["role"] as? String == "assistant",
-              let providerID = message["provider"] as? String,
-              let cardID = PiProviderMapping.cardID(forPiProvider: providerID),
+              let providerID = (message["provider"] as? String)?.nilIfEmpty,
               let usage = message["usage"] as? [String: Any]
         else { return nil }
 
@@ -128,7 +132,7 @@ actor PiUsageScanner {
         return Entry(
             id: object["id"] as? String,
             timestamp: timestamp,
-            cardID: cardID,
+            piProvider: providerID,
             model: (message["model"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
             carriedCost: carriedCost,
             tokens: tokens,
@@ -161,7 +165,8 @@ actor PiUsageScanner {
     ) -> LogUsageScan {
         let estimate = estimateCost ?? { pricing.estimatedCostDollars(model: $0, tokens: $1) }
         var accumulator = DailyUsageAccumulator()
-        for entry in entries where entry.cardID == cardID && entry.timestamp >= since {
+        for entry in entries
+        where entry.timestamp >= since && PiProviderMapping.cardID(forPiProvider: entry.piProvider) == cardID {
             let day = DailyUsageAccumulator.dayKey(from: entry.timestamp)
             let trimmedModel = entry.model.nilIfEmpty
             let modelName = trimmedModel ?? ModelUsageEntry.unattributedModelName

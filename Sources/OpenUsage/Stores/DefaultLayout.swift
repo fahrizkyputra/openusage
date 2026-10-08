@@ -49,6 +49,9 @@ enum DefaultLayout {
         "grok.weekly", "grok.trend",
         "grok.payAsYouGo", "grok.today", "grok.yesterday", "grok.last30",
 
+        "kimi.session", "kimi.weekly", "kimi.trend",
+        "kimi.today", "kimi.yesterday", "kimi.last30",
+
         "ollama.session", "ollama.weekly", "ollama.monthly", "ollama.last4Weeks",
 
         "opencode.session", "opencode.weekly", "opencode.monthly", "opencode.trend",
@@ -92,6 +95,7 @@ enum DefaultLayout {
         "commandcode.fiveHour", "commandcode.weekly",
         "cursor.auto", "cursor.api",
         "copilot.premium",
+        "kimi.session", "kimi.weekly",
         "ollama.session", "ollama.weekly",
         "openrouter.credits",
         "zai.session", "zai.weekly"
@@ -127,6 +131,9 @@ enum DefaultLayout {
         "copilot.orgCredits", "copilot.orgSpend", "copilot.chat", "copilot.completions",
         "devin.extra",
         "grok.payAsYouGo", "grok.today", "grok.yesterday", "grok.last30",
+        // Kimi: the Session/Weekly quota meters and Usage Trend stay above the fold; the spend tiles
+        // (sourced from pi's local logs) sit below the caret, matching the other local scanners.
+        "kimi.today", "kimi.yesterday", "kimi.last30",
         // Ollama: Session, Weekly, and Monthly stay above the fold; the rolling four-week spend total
         // (always $0.00 on a subscription, real only for pay-as-you-go) sits below the caret.
         "ollama.last4Weeks",

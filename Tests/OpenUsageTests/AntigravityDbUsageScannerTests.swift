@@ -184,7 +184,7 @@ final class AntigravityDbUsageScannerTests: XCTestCase {
         try FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: fixture.paths[0])
 
         _ = await scanner.scan(now: now, pricing: pricing)
-        let future = now.addingTimeInterval(31 * 86_400)
+        let future = now.addingTimeInterval(366 * 86_400)
         let expired = await scanner.scan(now: future, pricing: pricing)
         XCTAssertNil(expired)
 
@@ -207,7 +207,7 @@ final class AntigravityDbUsageScannerTests: XCTestCase {
         let missing = antigravityGenerationBlob(model: nil, input: 100, output: 50, timestamp: timestamp)
         let expired = antigravityGenerationBlob(
             model: "gemini-3.6-flash", input: 100, output: 50,
-            timestamp: UInt64(now.addingTimeInterval(-60 * 86_400).timeIntervalSince1970)
+            timestamp: UInt64(now.addingTimeInterval(-400 * 86_400).timeIntervalSince1970)
         )
         let sqlite = AntigravityFakeSQLite(rowsByPath: [fixture.paths[0]: [
             .init(index: 0, blob: unknown),

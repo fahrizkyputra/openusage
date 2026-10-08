@@ -12,7 +12,6 @@ struct TotalSpendCard: View {
     @Environment(LayoutStore.self) private var layout
     @Environment(WidgetDataStore.self) private var dataStore
     @Environment(\.colorScheme) private var colorScheme
-    @Namespace private var pickerNamespace
 
     /// The selected period survives popover closes and relaunches, like the meter-style toggles.
     @AppStorage(TotalSpendSetting.periodKey) private var periodRawValue = TotalSpendPeriod.today.rawValue
@@ -148,15 +147,15 @@ struct TotalSpendCard: View {
         }
     }
 
-    /// A capsule segmented switcher in the app's own design language (the footer's glass capsule
-    /// controls), replacing the stock `.segmented` picker whose legacy rounded-rect chrome clashes
-    /// with the Tahoe look. The selected segment is a Liquid Glass capsule (frosted material on
-    /// macOS 15) that slides between segments via `matchedGeometryEffect`.
+    /// A capsule switcher in the app's own design language: two fixed segments (Today / Yesterday)
+    /// plus a third segment that is a dropdown for the multi-day windows (7 / 14 / 30 / 60 Days,
+    /// 6 Months, 1 Year — default 30 Days). The selection persists across popover closes and
+    /// relaunches.
     private var periodPicker: some View {
         HStack(spacing: 2) {
-            ForEach(TotalSpendPeriod.allCases) { candidate in
-                periodSegment(candidate)
-            }
+            periodSegment(.today)
+            periodSegment(.yesterday)
+            rangeSegment
         }
         .padding(3)
         .background(.quinary, in: Capsule())
@@ -182,7 +181,49 @@ struct TotalSpendCard: View {
                 Capsule()
                     .fill(.background)
                     .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-                    .matchedGeometryEffect(id: "totalSpendPeriod", in: pickerNamespace)
+            }
+        }
+        .animation(Motion.spring, value: periodRawValue)
+    }
+
+    /// The third segment: a menu of multi-day windows. Shows the selected window's label and reads
+    /// selected whenever any multi-day window is active, so it doubles as the range display.
+    private var rangeSegment: some View {
+        let isSelected = period.usesDailySeries || period == .last30
+        return Menu {
+            ForEach(TotalSpendPeriod.allCases.filter(\.usesDailySeries)) { candidate in
+                Button {
+                    periodRawValue = candidate.rawValue
+                } label: {
+                    if candidate == period {
+                        Label(candidate.shortLabel, systemImage: "checkmark")
+                    } else {
+                        Text(candidate.shortLabel)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(isSelected && period != .last30 ? period.shortLabel : TotalSpendPeriod.last30.shortLabel)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 7, weight: .bold))
+            }
+            .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity)
+            .contentShape(Capsule())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .frame(maxWidth: .infinity)
+        .background {
+            if isSelected {
+                Capsule()
+                    .fill(.background)
+                    .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
             }
         }
         .animation(Motion.spring, value: periodRawValue)

@@ -45,7 +45,7 @@ struct OpenCodeUsageScanner: Sendable {
     /// Scan the last `daysBack` days. Returns `nil` only when there is no OpenCode database at all;
     /// a present-but-empty database yields an empty scan (idle tiles collapse to "No data" via
     /// `SpendTileMapper`). Throws `databaseUnreadable` when databases exist but none could be read.
-    func scan(now: Date, daysBack: Int = 30) async throws -> OpenCodeUsageScan? {
+    func scan(now: Date, daysBack: Int = 365) async throws -> OpenCodeUsageScan? {
         let paths: [String]
         do {
             paths = try databasePaths()

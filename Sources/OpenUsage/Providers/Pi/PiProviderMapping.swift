@@ -9,9 +9,9 @@ import Foundation
 /// equivalent are intentionally absent and left for future work:
 /// - `nvidia-nim` — no OpenUsage card.
 ///
-/// Mapped here but not yet consumed (only Claude and Codex read the pi slice today; the rest have no
-/// local usage-trend card to fold into, or use a different spend path): `cursor` (Cursor's trend is
-/// built from its CSV export), `zai`/`zhipu`, `google-antigravity`, `github-copilot`.
+/// Mapped here but not yet consumed (only Claude, Codex, and Kimi read the pi slice today; the rest
+/// have no local usage-trend card to fold into, or use a different spend path): `cursor` (Cursor's
+/// trend is built from its CSV export), `zai`/`zhipu`, `google-antigravity`, `github-copilot`.
 enum PiProviderMapping {
     /// pi `provider` value → OpenUsage `Provider.id`.
     static let providerToCard: [String: String] = [
@@ -19,6 +19,9 @@ enum PiProviderMapping {
         "claude-agent-sdk": "claude",
         "openai-codex": "codex",
         "cursor": "cursor",
+        "kimi": "kimi",
+        "kimi-coding": "kimi",
+        "moonshot": "kimi",
         "zai": "zai",
         "zhipu": "zai",
         "google-antigravity": "antigravity",

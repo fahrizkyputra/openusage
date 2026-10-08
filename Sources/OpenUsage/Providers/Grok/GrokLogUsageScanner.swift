@@ -41,7 +41,7 @@ actor GrokLogUsageScanner {
 
     /// Scan completed turns under `$GROK_HOME/sessions`, or `~/.grok/sessions` by default.
     /// Missing transcripts leave the spend tiles unbacked instead of falling back to the debug log.
-    func scan(daysBack: Int = 30, now: Date = Date(), pricing: ModelPricing) async -> LogUsageScan? {
+    func scan(daysBack: Int = 365, now: Date = Date(), pricing: ModelPricing) async -> LogUsageScan? {
         let directory = grokHome().appendingPathComponent("sessions", isDirectory: true)
         let identity = directory.resolvingSymlinksInPath().standardizedFileURL.path
         let since = JSONLScanning.sinceDate(daysBack: daysBack, now: now)
