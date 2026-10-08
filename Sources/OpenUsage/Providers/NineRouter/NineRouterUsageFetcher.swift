@@ -64,19 +64,15 @@ struct NineRouterUsageFetcher: Sendable {
         guard case .success(let body) = await load({ try await usageClient.fetchAccounts(auth: auth) }),
               let accounts = NineRouterUsageMapper.proxyAccounts(body) else {
             AppLog.warn(logTag, "account list unavailable; falling back to per-connection quotas")
-            let legacy = await tightestQuotas(auth: auth)
+            let legacy = await legacyKitchenQuotas(auth: auth)
             return (legacy.lines, legacy.sources, [])
         }
-        let quotas = accounts.flatMap { account -> [NineRouterUsageMapper.Quota] in
-            [(NineRouterUsageMapper.Window.session, account.sessionPercent, account.sessionResetsAt),
-             (NineRouterUsageMapper.Window.weekly, account.weeklyPercent, account.weeklyResetsAt)]
-                .compactMap { window, percent, reset in
-                    percent.map { NineRouterUsageMapper.Quota(window: window, percent: $0, resetsAt: reset, source: account.name) }
-                }
-        }
-        // The proxy reports each window's reset time; an older one doesn't, so fill any missing reset
-        // from the per-connection quota of the winning accounts only.
-        let tightest = await withResetTimes(NineRouterUsageMapper.tightestQuotas(quotas), accounts: accounts, auth: auth)
+        // On Kitchen, both card meters follow the same routable account: pick by Session remaining,
+        // then use that account's Weekly (if present). The local 9router card keeps its independent
+        // tightest-window aggregation.
+        let selected = NineRouterUsageMapper.kitchenQuotaLines(accounts)
+        // An older proxy lacks per-window resets; fill missing ones from the selected account only.
+        let tightest = await withResetTimes(selected, accounts: accounts, auth: auth)
         let lines = tightest.lines + [NineRouterUsageMapper.accountsLine(accounts)].compactMap { $0 }
         return (lines, tightest.sources, accounts)
     }
@@ -137,13 +133,15 @@ struct NineRouterUsageFetcher: Sendable {
         return (lines, tightest.sources, accounts)
     }
 
-    private func tightestQuotas(auth: NineRouterAuth) async -> (lines: [MetricLine], sources: [String: String]) {
+    /// Compatibility path for a proxy version without `/v1/accounts`. It doesn't expose connection
+    /// routing health, but still keeps Session and Weekly on the same active connection.
+    private func legacyKitchenQuotas(auth: NineRouterAuth) async -> (lines: [MetricLine], sources: [String: String]) {
         guard case .success(let body) = await load({ try await usageClient.fetchConnections(auth: auth) }),
               let connections = NineRouterUsageMapper.activeConnections(body) else {
             AppLog.warn(logTag, "connection list unavailable; skipping quota meters")
             return ([], [:])
         }
-        var quotas: [NineRouterUsageMapper.Quota] = []
+        var accounts: [GatewayAccount] = []
         for connection in connections {
             guard case .success(let usageBody) = await load({
                 try await usageClient.fetchConnectionUsage(connectionID: connection.id, auth: auth)
@@ -151,9 +149,22 @@ struct NineRouterUsageFetcher: Sendable {
                 AppLog.info(logTag, "quota unavailable for one connection; skipping it")
                 continue
             }
-            quotas += NineRouterUsageMapper.quotas(usageBody, source: connection.name)
+            let windows = NineRouterUsageMapper.quotas(usageBody, source: connection.name)
+            let session = windows.filter { $0.window == .session }.max { $0.percent < $1.percent }
+            let weekly = windows.filter { $0.window == .weekly }.max { $0.percent < $1.percent }
+            accounts.append(GatewayAccount(
+                id: connection.id,
+                name: connection.name,
+                provider: nil,
+                sessionPercent: session?.percent,
+                weeklyPercent: weekly?.percent,
+                sessionResetsAt: session?.resetsAt,
+                weeklyResetsAt: weekly?.resetsAt,
+                cost30dUSD: 0,
+                status: .ok
+            ))
         }
-        return NineRouterUsageMapper.tightestQuotas(quotas)
+        return NineRouterUsageMapper.kitchenQuotaLines(accounts)
     }
 
     private enum EndpointResult {

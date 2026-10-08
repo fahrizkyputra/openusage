@@ -89,9 +89,52 @@ enum NineRouterUsageMapper {
         }
     }
 
+    /// Kitchen's two headline meters follow one account: choose the routable account with the least
+    /// Session remaining (highest Session percent below 100). If all routable Session windows are
+    /// exhausted, choose the one that resets soonest. Weekly comes only from that selected account.
+    /// Paused / no-balance / auth-error connections aren't candidates; cooling-down connections remain
+    /// eligible because 9router can route other models through them.
+    static func kitchenQuotaLines(_ accounts: [GatewayAccount])
+        -> (lines: [MetricLine], sources: [String: String]) {
+        let eligible = accounts.filter {
+            ($0.status == .ok || $0.status == .coolingDown) && $0.sessionPercent != nil
+        }
+        let available = eligible.filter { ($0.sessionPercent ?? 100) < 100 }
+        let selected: GatewayAccount?
+        if !available.isEmpty {
+            selected = available.sorted { lhs, rhs in
+                if lhs.sessionPercent != rhs.sessionPercent {
+                    return (lhs.sessionPercent ?? 0) > (rhs.sessionPercent ?? 0)
+                }
+                let leftReset = lhs.sessionResetsAt ?? .distantFuture
+                let rightReset = rhs.sessionResetsAt ?? .distantFuture
+                if leftReset != rightReset { return leftReset < rightReset }
+                return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+            }.first
+        } else {
+            selected = eligible.sorted { lhs, rhs in
+                let leftReset = lhs.sessionResetsAt ?? .distantFuture
+                let rightReset = rhs.sessionResetsAt ?? .distantFuture
+                if leftReset != rightReset { return leftReset < rightReset }
+                return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+            }.first
+        }
+        guard let selected, let session = selected.sessionPercent else { return ([], [:]) }
+
+        var lines = [MetricLine.progress(label: "Session", used: session, limit: 100, format: .percent,
+                                         resetsAt: selected.sessionResetsAt, periodDurationMs: sessionPeriodMs)]
+        var sources = ["Session": selected.name]
+        if let weekly = selected.weeklyPercent {
+            lines.append(.progress(label: "Weekly", used: weekly, limit: 100, format: .percent,
+                                   resetsAt: selected.weeklyResetsAt, periodDurationMs: weeklyPeriodMs))
+            sources["Weekly"] = selected.name
+        }
+        return (lines, sources)
+    }
+
     /// The tightest Session and Weekly meters across every connection's quotas, plus the connection
     /// each came from (keyed by line label, for `ProviderSnapshot.lineSources`). Ties keep the window
-    /// that resets sooner, since it frees up first.
+    /// that resets sooner, since it frees up first. Used by the local 9router card.
     static func tightestQuotas(_ quotas: [Quota]) -> (lines: [MetricLine], sources: [String: String]) {
         let windows: [(window: Window, label: String, periodMs: Int)] = [
             (.session, "Session", sessionPeriodMs),

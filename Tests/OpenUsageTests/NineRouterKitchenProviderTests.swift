@@ -214,7 +214,7 @@ final class NineRouterKitchenProviderTests: XCTestCase {
     func testWhenEveryRoutableSessionIsExhaustedChooseTheSoonestResetAccount() async {
         let snapshot = await refresh(accounts: #"""
         {"accounts":[
-          {"id":"a","name":"Later reset","provider":"claude","sessionPercent":100,"weeklyPercent":15,"sessionResetAt":"2026-09-30T13:00:00Z","weeklyResetAt":"2026-10-03T00:00:00Z","cost30dUSD":0,"status":"ok"},
+          {"id":"a","name":"Later reset","provider":"claude","sessionPercent":100,"weeklyPercent":95,"sessionResetAt":"2026-09-30T13:00:00Z","weeklyResetAt":"2026-10-03T00:00:00Z","cost30dUSD":0,"status":"ok"},
           {"id":"b","name":"Sooner reset","provider":"claude","sessionPercent":100,"weeklyPercent":80,"sessionResetAt":"2026-09-30T12:30:00Z","weeklyResetAt":"2026-10-04T00:00:00Z","cost30dUSD":0,"status":"ok"}
         ]}
         """#).0
