@@ -12,6 +12,7 @@ final class UsageHistoryClassificationTests: XCTestCase {
             CodexProvider().widgetDescriptors,
             CursorProvider().widgetDescriptors,
             GrokProvider().widgetDescriptors,
+            KimiProvider().widgetDescriptors,
             OpenCodeProvider().widgetDescriptors
         ]
 
@@ -31,6 +32,7 @@ final class UsageHistoryClassificationTests: XCTestCase {
             "codex": .machineLocal,
             "cursor": .accountWide,
             "grok": .machineLocal,
+            "kimi": .machineLocal,
             "opencode": .machineLocal
         ])
     }

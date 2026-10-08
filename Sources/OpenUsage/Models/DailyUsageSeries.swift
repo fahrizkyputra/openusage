@@ -25,9 +25,14 @@ struct DailyUsageSeries: Hashable, Sendable, Codable {
 enum UsageHistoryWindow {
     static let previousDays = 30
 
-    static func dayKeys(through now: Date, calendar: Calendar = .current) -> Set<String> {
+    /// The day keys of a window ending today, today included: `days` calendar days, or
+    /// `previousDays + 1` for the shared local-history window. Day keys are the app's single
+    /// day-identity contract (`DailyUsageAccumulator.dayKey`), so a series entry is in the window by
+    /// exact key match — never by comparing its raw date string.
+    static func dayKeys(through now: Date, days: Int = previousDays + 1, calendar: Calendar = .current) -> Set<String> {
+        guard days > 0 else { return [] }
         let today = calendar.startOfDay(for: now)
-        return Set((0...previousDays).compactMap { offset in
+        return Set((0..<days).compactMap { offset in
             calendar.date(byAdding: .day, value: -offset, to: today)
                 .map { DailyUsageAccumulator.dayKey(from: $0, calendar: calendar) }
         })

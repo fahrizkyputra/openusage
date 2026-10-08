@@ -14,6 +14,9 @@ final class KimiProvider: ProviderRuntime {
 
     let authStore: KimiAuthStore
     let usageClient: KimiUsageClient
+    /// pi history source. Injectable so a test never reads the machine's real pi sessions, the way the
+    /// Claude/Codex cards inject their log scanners.
+    let piUsageScanner: PiUsageScanner
     let openCodeUsageScanner: OpenCodeKimiUsageScanner
     let pricing: @Sendable () async -> ModelPricing
     let now: @Sendable () -> Date
@@ -21,12 +24,14 @@ final class KimiProvider: ProviderRuntime {
     init(
         authStore: KimiAuthStore = KimiAuthStore(),
         usageClient: KimiUsageClient = KimiUsageClient(),
+        piUsageScanner: PiUsageScanner = .shared,
         openCodeUsageScanner: OpenCodeKimiUsageScanner = OpenCodeKimiUsageScanner(),
         pricing: @escaping @Sendable () async -> ModelPricing = { await ModelPricingStore.shared.current() },
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.authStore = authStore
         self.usageClient = usageClient
+        self.piUsageScanner = piUsageScanner
         self.openCodeUsageScanner = openCodeUsageScanner
         self.pricing = pricing
         self.now = now
@@ -44,7 +49,9 @@ final class KimiProvider: ProviderRuntime {
                 .exportingHistory(
                     scope: .machineLocal,
                     estimatedCost: true,
-                    sourceNote: "From your pi logs (estimated)"
+                    // Both local sources, because the card folds pi and OpenCode logs; the live rows
+                    // name the sources that actually contributed (see `snapshotWithLocalUsage`).
+                    sourceNote: "From your pi and OpenCode logs (estimated)"
                 )
         ] + WidgetDescriptor.spendTiles(provider: provider)
     }
@@ -87,7 +94,7 @@ final class KimiProvider: ProviderRuntime {
         var lines = mapped.lines
         var usageHistory: ProviderUsageHistory?
         let pricing = await pricing()
-        async let pi = PiUsageScanner.shared.scan(cardID: provider.id, now: now(), pricing: pricing)
+        async let pi = piUsageScanner.scan(cardID: provider.id, now: now(), pricing: pricing)
         async let openCode = openCodeUsageScanner.scan(now: now(), pricing: pricing)
         let (piScan, openCodeScan) = await (pi, openCode)
         if !Task.isCancelled, let scan = DailyUsageAccumulator.merged([piScan, openCodeScan]) {

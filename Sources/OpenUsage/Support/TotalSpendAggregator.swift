@@ -241,18 +241,17 @@ enum TotalSpendAggregator {
         now: Date
     ) -> TotalSpend {
         guard let days = period.windowDays else { return TotalSpend(period: period, slices: []) }
-        let calendar = Calendar.current
-        let start = calendar.date(byAdding: .day, value: -(days - 1), to: calendar.startOfDay(for: now)) ?? now
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.dateFormat = "yyyy-MM-dd"
-        let minDayKey = formatter.string(from: start)
+        // The shared day-identity contract: match series entries by day key, the way the trend, the
+        // spend tiles, and combined iCloud history already do. A raw date-string comparison would
+        // silently include an entry whose date isn't a day key at all (non-padded or ISO dates sort
+        // above a day-key bound).
+        let includedDays = UsageHistoryWindow.dayKeys(through: now, days: days)
 
         let slices = providers.compactMap { provider -> TotalSpendSlice? in
             guard let history = snapshots[provider.id]?.usageHistory else { return nil }
             var amount = 0.0
             var tokens = 0.0
-            for day in history.series.daily where day.date >= minDayKey {
+            for day in history.series.daily where includedDays.contains(day.date) {
                 amount += max(day.costUSD ?? 0, 0)
                 tokens += max(Double(day.totalTokens), 0)
             }

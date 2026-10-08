@@ -112,6 +112,10 @@ For bounded progress resources, `unit` follows the provider's live metric format
 | Copilot | `premiumCredits`, `extraUsage`, `orgCredits`, `orgSpend`, `chat`, `completions` |
 | Devin | `daily`, `weekly`, `extraUsageBalance` |
 | Grok | `weekly` |
+| 9router | `session`, `weekly` |
+| 9router Kitchen | `session`, `weekly` |
+| Kimi | `session`, `weekly` |
+| Command Code | `fiveHour`, `weekly`, `monthly` |
 | Ollama | `session`, `weekly`, `monthly` |
 | OpenCode | `session`, `weekly`, `monthly` |
 | OpenRouter | `credits`, `balance`, `keyLimit` |
