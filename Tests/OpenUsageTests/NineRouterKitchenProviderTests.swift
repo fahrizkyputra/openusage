@@ -257,6 +257,34 @@ final class NineRouterKitchenProviderTests: XCTestCase {
         XCTAssertEqual(snapshot.lineSources, ["Session": "Session winner"])
     }
 
+    func testAccountWithExhaustedWeeklyIsSkippedForTheNextOne() async {
+        let snapshot = await refresh(accounts: #"""
+        {"accounts":[
+          {"id":"a","name":"Weekly spent","provider":"claude","sessionPercent":73,"weeklyPercent":100,"sessionResetAt":"2026-09-30T14:00:00Z","weeklyResetAt":"2026-10-04T00:00:00Z","status":"cooling_down"},
+          {"id":"b","name":"Has room","provider":"claude","sessionPercent":17,"weeklyPercent":21,"sessionResetAt":"2026-09-30T15:00:00Z","weeklyResetAt":"2026-10-05T00:00:00Z","status":"ok"}
+        ]}
+        """#).0
+
+        guard case .progress(_, let sessionUsed, _, _, _, _, _) = snapshot.line(label: "Session"),
+              case .progress(_, let weeklyUsed, _, _, _, _, _) = snapshot.line(label: "Weekly") else {
+            return XCTFail("both meters")
+        }
+        XCTAssertEqual(sessionUsed, 17)
+        XCTAssertEqual(weeklyUsed, 21)
+        XCTAssertEqual(snapshot.lineSources, ["Session": "Has room", "Weekly": "Has room"])
+    }
+
+    func testWhenEveryWeeklyIsExhaustedChooseTheSoonestWeeklyReset() async {
+        let snapshot = await refresh(accounts: #"""
+        {"accounts":[
+          {"id":"a","name":"Later weekly reset","provider":"claude","sessionPercent":10,"weeklyPercent":100,"sessionResetAt":"2026-09-30T14:00:00Z","weeklyResetAt":"2026-10-04T00:00:00Z","status":"ok"},
+          {"id":"b","name":"Sooner weekly reset","provider":"claude","sessionPercent":50,"weeklyPercent":100,"sessionResetAt":"2026-09-30T15:00:00Z","weeklyResetAt":"2026-10-03T00:00:00Z","status":"ok"}
+        ]}
+        """#).0
+
+        XCTAssertEqual(snapshot.lineSources, ["Session": "Sooner weekly reset", "Weekly": "Sooner weekly reset"])
+    }
+
     private func refresh(accounts: String) async -> (ProviderSnapshot, FakeKitchenProxy) {
         let proxy = FakeKitchenProxy()
         proxy.accountsBody = accounts
