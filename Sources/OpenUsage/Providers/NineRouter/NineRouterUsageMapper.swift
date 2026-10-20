@@ -89,17 +89,24 @@ enum NineRouterUsageMapper {
         }
     }
 
-    /// Kitchen's two headline meters follow one account: choose the routable account with the least
-    /// Session remaining (highest Session percent below 100). If all routable Session windows are
-    /// exhausted, choose the one that resets soonest. Weekly comes only from that selected account.
-    /// Paused / no-balance / auth-error connections aren't candidates; cooling-down connections remain
+    /// Kitchen's two headline meters follow one account, the one 9router can still use. Candidates are
+    /// routable accounts (OK / cooling down) with Session data; an account whose Weekly is spent
+    /// (100%) can't serve requests, so it is skipped for the next one. Among the rest, pick the least
+    /// Session remaining (highest Session percent below 100). When nothing has room left, pick the
+    /// account that frees up first: the soonest Session reset, or the soonest Weekly reset when every
+    /// candidate's Weekly is spent. Weekly always comes from the selected account.
+    /// Paused / no-balance / auth-error connections aren't candidates; cooling-down connections stay
     /// eligible because 9router can route other models through them.
     static func kitchenQuotaLines(_ accounts: [GatewayAccount])
         -> (lines: [MetricLine], sources: [String: String]) {
+        func byName(_ lhs: GatewayAccount, _ rhs: GatewayAccount) -> Bool {
+            lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
         let eligible = accounts.filter {
             ($0.status == .ok || $0.status == .coolingDown) && $0.sessionPercent != nil
         }
-        let available = eligible.filter { ($0.sessionPercent ?? 100) < 100 }
+        let weeklyHasRoom = eligible.filter { ($0.weeklyPercent ?? 0) < 100 }
+        let available = weeklyHasRoom.filter { ($0.sessionPercent ?? 100) < 100 }
         let selected: GatewayAccount?
         if !available.isEmpty {
             selected = available.sorted { lhs, rhs in
@@ -109,14 +116,23 @@ enum NineRouterUsageMapper {
                 let leftReset = lhs.sessionResetsAt ?? .distantFuture
                 let rightReset = rhs.sessionResetsAt ?? .distantFuture
                 if leftReset != rightReset { return leftReset < rightReset }
-                return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+                return byName(lhs, rhs)
             }.first
-        } else {
-            selected = eligible.sorted { lhs, rhs in
+        } else if !weeklyHasRoom.isEmpty {
+            // Weekly has room but every Session is spent: the Session that resets first frees up first.
+            selected = weeklyHasRoom.sorted { lhs, rhs in
                 let leftReset = lhs.sessionResetsAt ?? .distantFuture
                 let rightReset = rhs.sessionResetsAt ?? .distantFuture
                 if leftReset != rightReset { return leftReset < rightReset }
-                return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+                return byName(lhs, rhs)
+            }.first
+        } else {
+            // Every candidate's Weekly is spent: the Weekly that resets first frees up first.
+            selected = eligible.sorted { lhs, rhs in
+                let leftReset = lhs.weeklyResetsAt ?? .distantFuture
+                let rightReset = rhs.weeklyResetsAt ?? .distantFuture
+                if leftReset != rightReset { return leftReset < rightReset }
+                return byName(lhs, rhs)
             }.first
         }
         guard let selected, let session = selected.sessionPercent else { return ([], [:]) }

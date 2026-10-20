@@ -78,8 +78,10 @@ Optional overrides (shell profile):
 A second card, **9router Kitchen**, tracks a remote 9router server with the same rows, and joins
 Total Spend the same way. Unlike local 9router, Kitchen's Session and Weekly bars both follow one
 account: among routable accounts with Session data, it shows the one with the least Session left
-(highest usage below 100%). Paused, no-balance, and auth-error accounts are skipped. If all routable
-accounts are at 100%, it shows the account whose Session resets soonest. Weekly comes from that same
+(highest usage below 100%). Paused, no-balance, and auth-error accounts are skipped, and so is an
+account whose Weekly is spent (100%): the card moves on to the next account. If every routable
+account is at 100% Session, it shows the one whose Session resets soonest; if every Weekly is spent,
+the one whose Weekly resets soonest. Weekly comes from that same
 account; if it has no Weekly quota, that bar is hidden. If there is no routable account with Session
 data, both bars are hidden. The Accounts popup still lists every active account. Kitchen's history is
 not combined across Macs by iCloud Sync, because every Mac already reads the server's total. The
