@@ -41,7 +41,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
         AppearanceSetting.applyCurrent()
-        let container = AppContainer(telemetry: PostHogTelemetrySink(), telemetryDefaults: TelemetryRecorder.suite)
+        let container = AppContainer(telemetry: TeamTelemetrySink(), telemetryDefaults: TelemetryRecorder.suite)
         self.container = container
         container.startRefreshing()
         Task { await APIKeyV1Files.importOnce(into: container.accounts) }

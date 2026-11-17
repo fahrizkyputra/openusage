@@ -12,7 +12,9 @@ final class PostHogTelemetrySink: TelemetrySink {
     /// The project token baked into the build: a client-side, write-only key that ships in every
     /// distributed binary, like any analytics SDK key, so it is safe to commit. The host is region-bound
     /// — a US token will not ingest against the EU host.
-    private static let token = "phc_vGEqXEpQNwViyKnMNWvmKWpv8XxMT3yaeYi6gfidr4nf"
+    /// Team build (fork-only): the upstream token is removed, so this sink cannot ingest anywhere. The
+    /// app uses `TeamTelemetrySink` instead; this type stays only to keep upstream's file shape.
+    private static let token = "phc_REPLACE_ME"
     private static let host = "https://us.i.posthog.com"
 
     init() {

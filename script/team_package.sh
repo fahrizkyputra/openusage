@@ -45,7 +45,7 @@ CLI_BINARY="$APP_HELPERS/openusage"
 ZIP_PATH="$OUT_DIR/$APP_NAME-Team-$VERSION.zip"
 
 # Refuse to package a build that still phones home to upstream PostHog (0.8 bakes the token as `token`).
-if grep -Eq 'token = "phc_[A-Za-z0-9]' Sources/OpenUsage/Services/Telemetry.swift; then
+if grep -Eq 'token = "phc_[A-Za-z0-9]{30,}"' Sources/OpenUsage/Services/Telemetry.swift; then
   echo "Telemetry token still baked in — team builds must ship with telemetry disabled." >&2
   exit 1
 fi
