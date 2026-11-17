@@ -105,13 +105,26 @@ final class TeamUpdateChecker {
     }
 }
 
+/// The environment the update check passes to `gh`: only what `gh` needs to find the user's own login.
+/// This is the one place the team build reads the process environment, and only to run the user's own
+/// GitHub CLI, never to find another tool's credentials.
+protocol TeamEnvironment: Sendable {
+    func value(for name: String) -> String?
+}
+
+struct ProcessTeamEnvironment: TeamEnvironment {
+    func value(for name: String) -> String? {
+        ProcessInfo.processInfo.environment[name].flatMap { $0.isEmpty ? nil : $0 }
+    }
+}
+
 /// Reads the latest release with the user's `gh` login. Blocking; call off the main actor.
 struct GitHubCLIReleaseSource: Sendable {
     /// Where Homebrew and the official installer put `gh`. A Finder-launched app has no shell `PATH`.
     static let candidatePaths = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh"]
 
     var runner: ProcessRunning = SystemProcessRunner()
-    var environment: EnvironmentReading = ProcessEnvironmentReader()
+    var environment: any TeamEnvironment = ProcessTeamEnvironment()
     var fileExists: @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
 
     func latest(repo: String) -> TeamUpdateChecker.Release? {

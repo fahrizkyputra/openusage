@@ -10,6 +10,12 @@ private final class FakeRunner: ProcessRunning, @unchecked Sendable {
     }
 }
 
+private struct FakeEnvironment: TeamEnvironment {
+    var values: [String: String] = [:]
+    init(_ values: [String: String] = [:]) { self.values = values }
+    func value(for name: String) -> String? { values[name] }
+}
+
 private final class Box<T>: @unchecked Sendable { var value: T; init(_ v: T) { value = v } }
 
 @MainActor
