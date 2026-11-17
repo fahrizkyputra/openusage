@@ -14,6 +14,8 @@ final class AppContainer {
     let hideFromScreenShare: HideFromScreenShareSetting
     let telemetry: TelemetryRecorder
     let hubs: CLIProxyHubSync
+    /// Team builds: finds a newer team release for the dashboard banner. Inert without `TeamUpdateRepo`.
+    let teamUpdates = TeamUpdateChecker()
     private(set) var isRefreshingNow = false
     @ObservationIgnored private var providers: [ProviderRuntime]
     @ObservationIgnored private let makeRuntimes: RuntimeFactory

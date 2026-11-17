@@ -9,6 +9,7 @@ struct DashboardContentView: View {
     @Binding var scrollPosition: ScrollPosition
 
     @Environment(UpdaterController.self) private var updater
+    @Environment(\.teamUpdates) private var teamUpdates
 
     /// Half the space on each side of the content: it and the bar beside it each hold this much.
     static let barGap: CGFloat = 7
@@ -22,6 +23,13 @@ struct DashboardContentView: View {
                     UpdateBannerCard(version: updateVersion)
                         .padding(.bottom, PanelMetrics.sectionSpacing)
                         .transition(.scale(scale: 0.95).combined(with: .opacity))
+                } else if let teamRelease = teamUpdates.available {
+                    // Team builds: a newer team release, found through the user's GitHub CLI login.
+                    TeamUpdateBannerCard(version: teamRelease.version) {
+                        withAnimation(Motion.modeSwitch) { popover.screen = .teamUpdate }
+                    }
+                    .padding(.bottom, PanelMetrics.sectionSpacing)
+                    .transition(.scale(scale: 0.95).combined(with: .opacity))
                 }
                 widgetContent
             }

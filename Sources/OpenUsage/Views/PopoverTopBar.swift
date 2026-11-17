@@ -37,6 +37,12 @@ struct PopoverTopBar: View {
                     EmptyView()
                 }
             }
+        case .teamUpdate:
+            navigationBar(back: { popover.back() }) {
+                Text("Update")
+            } trailing: {
+                EmptyView()
+            }
         case .settings:
             VStack(spacing: 10) {
                 ZStack {

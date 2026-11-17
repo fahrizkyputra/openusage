@@ -49,6 +49,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let launchDurationMS = Int((ProcessInfo.processInfo.systemUptime - processStartedAt) * 1_000)
         AppLog.info(.lifecycle, "launch to status item ready: \(launchDurationMS) ms")
         updater.start()
+        container.teamUpdates.start()
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

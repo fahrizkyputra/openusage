@@ -5,12 +5,15 @@ enum PopoverScreen: Hashable, Sendable {
     case dashboard
     case accounts
     case settings
+    /// Team builds: how to update to the latest team release (opened from the dashboard banner).
+    case teamUpdate
 
     var slideRank: Int {
         switch self {
         case .dashboard: 0
         case .accounts: 1
         case .settings: 2
+        case .teamUpdate: 3
         }
     }
 }

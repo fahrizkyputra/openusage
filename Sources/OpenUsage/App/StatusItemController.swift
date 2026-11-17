@@ -123,6 +123,7 @@ final class StatusItemController: NSObject {
                     .environment(container.renaming)
                     .environment(container.popover)
                     .environment(updater)
+                    .environment(\.teamUpdates, container.teamUpdates)
             )
         )
         self.host = host

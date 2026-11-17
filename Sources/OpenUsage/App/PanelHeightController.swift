@@ -162,6 +162,7 @@ final class PanelHeightController {
         case .dashboard: tab == .priority ? "openusage.panel.height.dashboard" : "openusage.panel.height.dashboard.allUsage"
         case .accounts: "openusage.panel.height.accounts"
         case .settings: "openusage.panel.height.settings"
+        case .teamUpdate: "openusage.panel.height.teamUpdate"
         }
     }
 }
