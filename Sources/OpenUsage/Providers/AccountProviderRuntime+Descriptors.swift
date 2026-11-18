@@ -50,7 +50,9 @@ extension AccountProviderRuntime {
                 .boundedDollars(key: "monthly", provider: provider, title: "Monthly", limit: 100)
                     .exportingLimit("monthly", unit: "usd"),
                 .values(key: "extra", provider: provider, title: "Extra credits", valueWord: "left"),
-                .boundedCount(key: "requests", provider: provider, title: "Requests", limit: 0)
+                .boundedCount(key: "requests", provider: provider, title: "Requests", limit: 0),
+                .history(key: "today", provider: provider, .window(.today, .spend, then: .tokens)),
+                .history(key: "yesterday", provider: provider, .window(.yesterday, .spend, then: .tokens))
             ]
         case .cursor:
             [

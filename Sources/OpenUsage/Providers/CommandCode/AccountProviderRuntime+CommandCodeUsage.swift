@@ -21,6 +21,9 @@ extension AccountProviderRuntime {
         let plan = successBody(subscriptionResponse).flatMap(CommandCodeUsageMapper.subscription)
         let summary = try? await client.summary(apiKey: apiKey, orgID: orgID, since: plan?.periodStart)
         let requests = summary.flatMap(successBody).flatMap(CommandCodeUsageMapper.summary)?.requests
-        return try CommandCodeUsageMapper.map(credits: creditsResponse.body, subscription: plan, requests: requests)
+        var usage = try CommandCodeUsageMapper.map(credits: creditsResponse.body, subscription: plan, requests: requests)
+        usage.history = await refreshHistory(using: CommandCodeHistorySource(
+            client: client, apiKey: apiKey, orgID: orgID, periodStart: plan?.periodStart))
+        return usage
     }
 }

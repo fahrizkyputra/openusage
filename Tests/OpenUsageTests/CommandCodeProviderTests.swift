@@ -38,7 +38,7 @@ final class CommandCodeProviderTests: XCTestCase {
 
         let snapshot = try result.get()
         XCTAssertEqual(snapshot.plan, "GOAT")
-        XCTAssertEqual(snapshot.lines.map(\.label), ["5-hour", "Weekly", "Monthly", "Extra credits", "Requests"])
+        XCTAssertEqual(snapshot.lines.map(\.label), ["5-hour", "Weekly", "Monthly", "Extra credits", "Requests", "Today", "Yesterday"])
         XCTAssertEqual(Set(http.requests.map(\.url.path)), [
             "/alpha/whoami", "/alpha/billing/credits", "/alpha/billing/subscriptions", "/alpha/usage/summary"
         ])
@@ -50,9 +50,12 @@ final class CommandCodeProviderTests: XCTestCase {
     func testTheRequestCountIsReadFromTheBillingPeriodStart() async throws {
         let (_, http) = try await refresh { Self.live($0) }
 
-        let summary = try XCTUnwrap(http.requests.first { $0.url.path == "/alpha/usage/summary" })
-        let since = URLComponents(url: summary.url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "since" }?.value
-        XCTAssertEqual(since.flatMap(OpenUsageISO8601.date(from:)), OpenUsageISO8601.date(from: "2026-09-09T04:59:00.000Z"))
+        let sinces = http.requests.filter { $0.url.path == "/alpha/usage/summary" }.compactMap { request in
+            URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.queryItems?
+                .first { $0.name == "since" }?.value.flatMap(OpenUsageISO8601.date(from:))
+        }
+        XCTAssertTrue(sinces.contains(OpenUsageISO8601.date(from: "2026-09-09T04:59:00.000Z")!),
+                      "the request count is read from the billing period start; Today and Yesterday read their own starts")
     }
 
     func testAnOrganizationSeatScopesTheBillingReads() async throws {
@@ -97,6 +100,6 @@ final class CommandCodeProviderTests: XCTestCase {
 
     func testTheDescriptorsMatchTheLinesTheMapperEmits() {
         let descriptors = AccountProviderRuntime.widgetDescriptors(for: Account(kind: .commandcode, label: "Work"))
-        XCTAssertEqual(descriptors.map(\.metricLabel), ["5-hour", "Weekly", "Monthly", "Extra credits", "Requests"])
+        XCTAssertEqual(descriptors.map(\.metricLabel), ["5-hour", "Weekly", "Monthly", "Extra credits", "Requests", "Today", "Yesterday"])
     }
 }
