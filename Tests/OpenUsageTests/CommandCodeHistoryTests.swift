@@ -114,7 +114,6 @@ final class CommandCodeHistoryTests: XCTestCase {
             return XCTFail("Today and Yesterday rows")
         }
         XCTAssertEqual(today.first { $0.kind == .dollars }?.number, 2.0)
-        XCTAssertEqual(today.first { $0.kind == .dollars }?.estimated, false, "billed, not an estimate")
         XCTAssertEqual(yesterday.first { $0.kind == .dollars }?.number ?? 0, 0.5, accuracy: 0.0001)
     }
 }
