@@ -43,8 +43,12 @@ extension AccountProviderRuntime {
             ]
         case .commandcode:
             [
-                .percent(key: "fiveHour", provider: provider, title: "5-hour")
-                    .exportingLimit("fiveHour", unit: "percent")
+                .boundedDollars(key: "fiveHour", provider: provider, title: "5-hour", limit: 100)
+                    .exportingLimit("fiveHour", unit: "usd"),
+                .boundedDollars(key: "weekly", provider: provider, title: "Weekly", limit: 100)
+                    .exportingLimit("weekly", unit: "usd"),
+                .boundedDollars(key: "monthly", provider: provider, title: "Monthly", limit: 100)
+                    .exportingLimit("monthly", unit: "usd")
             ]
         case .cursor:
             [

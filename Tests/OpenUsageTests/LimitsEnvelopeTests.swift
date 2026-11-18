@@ -291,6 +291,7 @@ final class LimitsEnvelopeTests: XCTestCase {
         let expected: [String: Set<String>] = [
             "claude": ["session", "weekly", "sonnet", "fable", "extraUsage", "rateLimitResets"],
             "codex": ["session", "weekly", "spark", "sparkWeekly", "credits", "rateLimitResets"],
+            "commandcode": ["fiveHour", "weekly", "monthly"],
             "cursor": ["totalUsage", "grokBot", "autoUsage", "apiUsage", "onDemand", "requests", "credits"],
             "amp": ["agentUsage", "orbHours", "free", "credits"],
             "antigravity": ["geminiSession", "geminiWeekly", "argonWeekly", "nonGeminiSession", "nonGeminiWeekly"],
