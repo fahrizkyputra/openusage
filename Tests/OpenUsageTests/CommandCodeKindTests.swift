@@ -29,14 +29,4 @@ final class CommandCodeKindTests: XCTestCase {
                                                organization: "", domain: GitHubDomain(saved: nil))
         XCTAssertTrue(login is APIKeyLogin, "no bespoke login: the key is checked by one usage read")
     }
-
-    func testCommandCodeReportsNoUsageUntilTheMapperIsBuilt() async throws {
-        // Registered, so the runtime accepts the kind. The read itself arrives with the usage client (T5).
-        let account = Account(kind: .commandcode, label: "Work")
-        let vault = InMemoryCredentialVault()
-        try vault.save(.apiKey("key"), for: account.id)
-        let runtime = AccountProviderRuntime(account: account, vault: vault, http: RoutingHTTPClient { _ in .json("{}") })
-        XCTAssertEqual(runtime.provider.kind, .commandcode)
-        XCTAssertEqual(runtime.provider.displayName, "Command Code")
-    }
 }

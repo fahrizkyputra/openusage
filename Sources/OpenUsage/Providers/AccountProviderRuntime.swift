@@ -402,7 +402,7 @@ final class AccountProviderRuntime: ProviderRuntime {
         return usage
     }
 
-    private func successBody(_ response: HTTPResponse?) -> Data? {
+    func successBody(_ response: HTTPResponse?) -> Data? {
         guard let response, (200..<300).contains(response.statusCode) else { return nil }
         return response.body
     }
