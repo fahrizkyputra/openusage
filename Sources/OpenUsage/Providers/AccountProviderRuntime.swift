@@ -9,6 +9,8 @@ final class AccountProviderRuntime: ProviderRuntime {
     let now: () -> Date
     /// Where 9router Kitchen is, from the build; nil when the build has no host.
     let kitchenHost: URL?
+    /// One `/v1/accounts` answer shared by every Kitchen card of a refresh pass.
+    let kitchenReads: KitchenReadShare
     var planRead = SecondaryRead<String>()
     var planBodyRead = SecondaryRead<Data>()
     var codexResetCreditsRead = SecondaryRead<HTTPResponse>()
@@ -45,9 +47,11 @@ final class AccountProviderRuntime: ProviderRuntime {
         http: any HTTPClient = URLSessionHTTPClient(),
         now: @escaping () -> Date = Date.init,
         claudeSessions: ClaudeSessions = ClaudeSessions(),
-        kitchenHost: URL? = NineRouterKitchenHost.baseURL()
+        kitchenHost: URL? = NineRouterKitchenHost.baseURL(),
+        kitchenReads: KitchenReadShare = KitchenReadShare()
     ) {
         self.kitchenHost = kitchenHost
+        self.kitchenReads = kitchenReads
         self.account = account
         claude = ClaudeAccountState(sessions: claudeSessions)
         self.vault = vault

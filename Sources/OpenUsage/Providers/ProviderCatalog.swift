@@ -14,8 +14,10 @@ enum ProviderCatalog {
         hubsEnabled: Bool = CLIProxyHub.isEnabled,
         hubLoginMissing: @escaping @Sendable (UUID) async -> Void = { _ in },
         claudeSessions: ClaudeSessions = ClaudeSessions(),
+        kitchenHost: URL? = NineRouterKitchenHost.baseURL(),
         reusing existing: [AccountProviderRuntime] = []
     ) -> [AccountProviderRuntime] {
+        let kitchenReads = KitchenReadShare()
         let existingByID = Dictionary(existing.map { ($0.account.id, $0) }, uniquingKeysWith: { first, _ in first })
         return accounts.map { account in
             guard let runtime = existingByID[account.id], runtime.account.hub == account.hub else {
@@ -28,7 +30,13 @@ enum ProviderCatalog {
                     )
                 case _?: HubOff()
                 }
-                return AccountProviderRuntime(account: account, vault: vault, http: client, claudeSessions: claudeSessions)
+                // A Kitchen connection card reads with its parent's key, and every Kitchen card shares one read.
+                let accountVault: any CredentialVault = account.parentID.map {
+                    ConnectionCredentialVault(parentID: $0, parent: vault)
+                } ?? vault
+                return AccountProviderRuntime(
+                    account: account, vault: accountVault, http: client, claudeSessions: claudeSessions,
+                    kitchenHost: kitchenHost, kitchenReads: kitchenReads)
             }
             runtime.update(account)
             return runtime

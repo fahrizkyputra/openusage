@@ -108,6 +108,8 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
     /// A 9router Kitchen connection card carries the connection's id on the server; every other account,
     /// including the Kitchen account that holds the API key, has none.
     var upstream: String?
+    /// The Kitchen account whose API key a connection card reads with; nil for every other account.
+    var parentID: UUID?
     let addedAt: Date
 
     var authMethod: ProviderAuthMethod {
@@ -120,7 +122,7 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
 
     init(
         id: UUID = UUID(), kind: ProviderKind, label: String, organization: String? = nil, domain: String? = nil,
-        hub: HubLink? = nil, upstream: String? = nil, addedAt: Date = Date()
+        hub: HubLink? = nil, upstream: String? = nil, parentID: UUID? = nil, addedAt: Date = Date()
     ) {
         self.id = id
         self.kind = kind
@@ -129,6 +131,7 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
         self.domain = domain
         self.hub = hub
         self.upstream = upstream
+        self.parentID = parentID
         self.addedAt = addedAt
     }
 }

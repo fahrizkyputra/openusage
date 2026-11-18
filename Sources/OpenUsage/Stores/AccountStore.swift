@@ -105,6 +105,8 @@ final class AccountStore {
         do {
             try credentialVault.delete(id)
             accounts.remove(at: accountIndex)
+            // A team build's connection accounts read with their parent's key, so they go with it.
+            accounts.removeAll { $0.parentID == id }
             persist()
             didChange?()
         } catch {
@@ -228,6 +230,31 @@ final class AccountStore {
             AppLog.error(LogTag.auth("cliproxy"), "could not save \(failures.count) of \(hub.host)'s logins in the Keychain: \(failure.localizedDescription)")
             throw ProviderError.unavailable("OpenUsage couldn’t save this hub’s logins in the Keychain. It tries again when Accounts opens.")
         }
+    }
+
+    /// A team build's connection accounts: each hangs off the account that `parent` names (an account's
+    /// `upstream` carries the connection id, and `parentID` ties it back) and has no credential of its own.
+    func applyConnectionAccounts(of parentID: UUID, to wanted: [(id: String, name: String)]) throws {
+        let owned = accounts.filter { $0.upstream != nil && $0.parentID == parentID }
+        let wantedIDs = Set(wanted.map(\.id))
+        var changed = false
+        let gone = owned.filter { !wantedIDs.contains($0.upstream ?? "") }.map(\.id)
+        if !gone.isEmpty { accounts.removeAll { gone.contains($0.id) }; changed = true }
+        for (id, name) in wanted {
+            let label = Self.name(name, for: .ninerouterKitchen)
+            if let index = accounts.firstIndex(where: { $0.parentID == parentID && $0.upstream == id }) {
+                if accounts[index].label != label { accounts[index].label = label; changed = true }
+            } else {
+                var account = newAccount(kind: .ninerouterKitchen, label: name)
+                account.upstream = id
+                account.parentID = parentID
+                accounts.append(account)
+                changed = true
+            }
+        }
+        guard changed else { return }
+        persist()
+        didChange?()
     }
 
     /// A card id keeps only the first 8 hex digits of the account's id, and two cards with one id crash

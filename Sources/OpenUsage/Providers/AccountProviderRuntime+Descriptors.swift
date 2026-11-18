@@ -150,11 +150,23 @@ extension AccountProviderRuntime {
                     .exportingLimit("weekly", unit: "percent")
             ]
         case .ninerouterKitchen:
-            [
+            // A connection card shows its own windows and cost; the summary card adds the account list and
+            // the spend rows.
+            account.upstream != nil ? [
                 .percent(key: "session", provider: provider, title: "Session")
                     .exportingLimit("session", unit: "percent"),
                 .percent(key: "weekly", provider: provider, title: "Weekly")
-                    .exportingLimit("weekly", unit: "percent")
+                    .exportingLimit("weekly", unit: "percent"),
+                .values(key: "cost30d", provider: provider, title: "Cost 30 Days", metricLabel: "Cost 30 Days")
+            ] : [
+                .percent(key: "session", provider: provider, title: "Session")
+                    .exportingLimit("session", unit: "percent"),
+                .percent(key: "weekly", provider: provider, title: "Weekly")
+                    .exportingLimit("weekly", unit: "percent"),
+                .badge(key: "accounts", provider: provider, title: "Accounts"),
+                .history(key: "today", provider: provider, .window(.today, .spend, then: .tokens)),
+                .history(key: "yesterday", provider: provider, .window(.yesterday, .spend, then: .tokens)),
+                .history(key: "last30", provider: provider, .window(.lastDays(30), .spend, then: .tokens))
             ]
         case .ollama:
             [
