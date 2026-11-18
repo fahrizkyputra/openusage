@@ -10,6 +10,7 @@ enum ProviderAuthMethod: Sendable, Hashable {
 enum ProviderKind: String, Codable, CaseIterable, Sendable {
     case claude
     case codex
+    case commandcode
     case cursor
     case amp
     case antigravity
@@ -26,6 +27,7 @@ enum ProviderKind: String, Codable, CaseIterable, Sendable {
         switch self {
         case .claude: "Claude"
         case .codex: "ChatGPT"
+        case .commandcode: "Command Code"
         case .cursor: "Cursor"
         case .amp: "Amp"
         case .antigravity: "Antigravity"
@@ -46,6 +48,8 @@ enum ProviderKind: String, Codable, CaseIterable, Sendable {
                        .init(label: "Usage Dashboard", url: URL(string: "https://claude.ai/settings/usage")!)]
         case .codex: [.init(label: "Status Page", url: URL(string: "https://status.openai.com/")!),
                       .init(label: "Usage Dashboard", url: URL(string: "https://chatgpt.com/settings/usage")!)]
+        case .commandcode: [.init(label: "Status Page", url: URL(string: "https://status.commandcode.ai/")!),
+                            .init(label: "Usage Dashboard", url: URL(string: "https://commandcode.ai/studio")!)]
         case .cursor: [.init(label: "Status Page", url: URL(string: "https://status.cursor.com/")!),
                        .init(label: "Usage Dashboard", url: URL(string: "https://www.cursor.com/dashboard")!)]
         case .amp: [.init(label: "Usage Dashboard", url: URL(string: "https://ampcode.com/settings")!)]
@@ -71,6 +75,7 @@ enum ProviderKind: String, Codable, CaseIterable, Sendable {
         switch self {
         case .claude, .codex, .cursor, .amp, .antigravity, .devin, .grok, .muse, .opencodeGo: [.oauth]
         case .copilot: [.oauth, .organizationToken]
+        case .commandcode: [.apiKey(keyPage: URL(string: "https://commandcode.ai/studio")!)]
         case .ollama: [.apiKey(keyPage: URL(string: "https://ollama.com/settings/keys")!)]
         case .openrouter: [.apiKey(keyPage: URL(string: "https://openrouter.ai/settings/management-keys")!)]
         case .zai: [.apiKey(keyPage: URL(string: "https://z.ai/manage-apikey/apikey-list")!)]

@@ -185,6 +185,7 @@ enum DemoFactory {
         switch account.kind {
         case .claude: ["Pro", "Max", "Ultra"]
         case .codex: ["Plus", "Pro", "Business"]
+        case .commandcode: ["Go", "GOAT", "Pro", "Max"]
         case .cursor: ["Pro", "Pro+", "Ultra"]
         case .amp: ["Free", "Megawatt"]
         case .antigravity: ["AI Pro", "AI Ultra"]

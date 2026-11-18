@@ -41,6 +41,11 @@ extension AccountProviderRuntime {
                 .history(key: "yesterday", provider: provider, .window(.yesterday, .tokens)),
                 .history(key: "last30", provider: provider, .window(.lastDays(30), .tokens))
             ]
+        case .commandcode:
+            [
+                .percent(key: "fiveHour", provider: provider, title: "5-hour")
+                    .exportingLimit("fiveHour", unit: "percent")
+            ]
         case .cursor:
             [
                 .percent(key: "usage", provider: provider, title: "Total Usage", metricLabel: "Total usage")
