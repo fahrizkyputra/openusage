@@ -49,7 +49,7 @@ enum APIKeyV1Files {
     }
 
     /// 0.7.x saved the providers it had on, or, before that list existed, the ones the user turned off.
-    private static func wasTurnedOff(_ kind: ProviderKind, in defaults: UserDefaults) -> Bool {
+    static func wasTurnedOff(_ kind: ProviderKind, in defaults: UserDefaults) -> Bool {
         let isKind = { (id: String) in id.prefix { $0 != "@" } == kind.rawValue }
         if let enabled = defaults.stringArray(forKey: "openusage.enabledProviders.v1") {
             return !enabled.contains(where: isKind)
