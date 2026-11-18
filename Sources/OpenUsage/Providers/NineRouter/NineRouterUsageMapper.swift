@@ -85,6 +85,52 @@ enum NineRouterUsageMapper {
         return ProviderUsage(plan: nil, lines: lines)
     }
 
+    /// The one connection the summary card shows. Candidates are routable connections (OK or cooling down)
+    /// that report a Session; one whose Weekly is spent (100%) cannot serve requests, so the next is taken.
+    /// Among the rest, the least Session remaining (highest percent below 100). When none has room, the one
+    /// that frees up first: the soonest Session reset, or the soonest Weekly reset when every Weekly is spent.
+    /// Ties break by name, so the card never flips between refreshes. Paused, no-balance, and auth-error
+    /// connections are never candidates; cooling down stays eligible because 9router can route other models
+    /// through it.
+    static func selectedConnection(_ connections: [KitchenConnection]) -> KitchenConnection? {
+        func byName(_ lhs: KitchenConnection, _ rhs: KitchenConnection) -> Bool {
+            lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+        func soonest(_ connections: [KitchenConnection], _ reset: KeyPath<KitchenConnection, Date?>) -> KitchenConnection? {
+            connections.sorted { lhs, rhs in
+                let left = lhs[keyPath: reset] ?? .distantFuture
+                let right = rhs[keyPath: reset] ?? .distantFuture
+                return left != right ? left < right : byName(lhs, rhs)
+            }.first
+        }
+        let eligible = connections.filter { ($0.status == .ok || $0.status == .coolingDown) && $0.sessionPercent != nil }
+        let weeklyHasRoom = eligible.filter { ($0.weeklyPercent ?? 0) < 100 }
+        let available = weeklyHasRoom.filter { ($0.sessionPercent ?? 100) < 100 }
+        if !available.isEmpty {
+            return available.sorted { lhs, rhs in
+                if lhs.sessionPercent != rhs.sessionPercent { return (lhs.sessionPercent ?? 0) > (rhs.sessionPercent ?? 0) }
+                let left = lhs.sessionResetsAt ?? .distantFuture
+                let right = rhs.sessionResetsAt ?? .distantFuture
+                return left != right ? left < right : byName(lhs, rhs)
+            }.first
+        }
+        if !weeklyHasRoom.isEmpty { return soonest(weeklyHasRoom, \.sessionResetsAt) }
+        return soonest(eligible, \.weeklyResetsAt)
+    }
+
+    /// The summary card's Session and Weekly, both from `selectedConnection`; Weekly is absent when that
+    /// connection reports none, never borrowed from another.
+    static func summaryLines(_ connections: [KitchenConnection]) -> [MetricLine] {
+        guard let selected = selectedConnection(connections) else { return [] }
+        return connectionUsage(selected).lines.filter { $0.label == "Session" || $0.label == "Weekly" }
+    }
+
+    /// Row titles that name the account a summary meter came from ("Session · AI-TECH - TEAM").
+    static func summaryTitles(_ connections: [KitchenConnection]) -> [String: String] {
+        guard let selected = selectedConnection(connections) else { return [:] }
+        return Dictionary(uniqueKeysWithValues: summaryLines(connections).map { ($0.label, "\($0.label) · \(selected.name)") })
+    }
+
     /// "4 active · 1 paused": the problem's name when every problem is one kind, else "need attention".
     static func summary(_ connections: [KitchenConnection]) -> String {
         let base = "\(connections.count) active"
