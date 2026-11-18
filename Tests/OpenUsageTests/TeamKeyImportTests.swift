@@ -50,8 +50,10 @@ final class TeamKeyImportTests: XCTestCase {
 
         _ = await run(store, home: home)
 
-        XCTAssertEqual(store.accounts.map(\.kind), [.ninerouterKitchen, .commandcode, .kimi])
-        XCTAssertEqual(try store.accounts.map { try vault.load($0.id) }, [.apiKey("sk-k"), .apiKey("user_c"), .apiKey("sk-kimi")])
+        // The Kitchen key also brings its connection account; only the accounts that hold a key are compared.
+        let keyed = store.accounts.filter { $0.upstream == nil }
+        XCTAssertEqual(keyed.map(\.kind), [.ninerouterKitchen, .commandcode, .kimi])
+        XCTAssertEqual(try keyed.map { try vault.load($0.id) }, [.apiKey("sk-k"), .apiKey("user_c"), .apiKey("sk-kimi")])
         XCTAssertEqual(try String(contentsOf: home.appending(path: ".config/openusage/commandcode.json"), encoding: .utf8),
                        #"{"apiKey":"user_c"}"#, "the file stays, so a downgrade finds it as it left it")
     }
