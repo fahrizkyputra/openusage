@@ -37,14 +37,19 @@ final class NineRouterHistoryTests: XCTestCase {
     }
 
     func testTheSourceDeclaresTheServersZoneAsItsCalendar() {
-        XCTAssertEqual(source().calendar.timeZone.identifier, "UTC")
+        XCTAssertEqual(source().calendar.timeZone.secondsFromGMT(), 0, "the server's UTC, not this Mac's zone")
         XCTAssertEqual(source().rereadInterval, 3600)
     }
 
-    func testADayTheServerNamesNothingForIsAZeroDayInsideTheWindow() async {
-        let read = await source().read([day(0), day(5)], asOf: Self.now, calendar: Self.utc)
+    func testAGapInsideTheAnsweredWindowIsAZeroDayAndADayBeforeItIsUnread() async {
+        // The server names the 16th and the 18th, not the 17th: the 17th is quiet. The 10th predates everything
+        // it answered, so it was never read, and showing 0 for it would claim a quiet day nobody observed.
+        let gap = #"{"timeZone":"UTC","days":[{"date":"2026-11-16","costUSD":10,"tokens":1000},{"date":"2026-11-18","costUSD":30,"tokens":3000}]}"#
+        let read = await source(gap).read([day(0), day(1), day(2), day(8)], asOf: Self.now, calendar: Self.utc)
 
-        XCTAssertEqual(read.days[day(5)]?.totals[.spend], 0, "inside the 30 days the server answered, quiet is zero")
+        XCTAssertEqual(read.days[day(1)]?.totals[.spend], 0, "inside the window the server answered, quiet is zero")
+        XCTAssertEqual(read.days[day(0)]?.totals[.spend], 30)
+        XCTAssertNil(read.days[day(8)], "before the oldest day the server answered, a day is unread, never zero")
     }
 
     func testAFailedOrMalformedReadLeavesEveryDayUnread() async {
