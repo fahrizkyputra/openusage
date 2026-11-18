@@ -17,6 +17,7 @@ enum ProviderKind: String, Codable, CaseIterable, Sendable {
     case copilot
     case devin
     case grok
+    case kimi
     case muse
     case ollama
     case opencodeGo = "opencode"
@@ -34,6 +35,7 @@ enum ProviderKind: String, Codable, CaseIterable, Sendable {
         case .copilot: "Copilot"
         case .devin: "Devin"
         case .grok: "Grok"
+        case .kimi: "Kimi"
         case .muse: "Muse Code"
         case .ollama: "Ollama"
         case .opencodeGo: "OpenCode"
@@ -58,6 +60,7 @@ enum ProviderKind: String, Codable, CaseIterable, Sendable {
                         .init(label: "Usage Dashboard", url: URL(string: "https://github.com/settings/billing")!)]
         case .devin: [.init(label: "Usage Dashboard", url: URL(string: "https://app.devin.ai/settings/plans")!)]
         case .grok: [.init(label: "Usage Dashboard", url: URL(string: "https://grok.com/?_s=usage")!)]
+        case .kimi: [.init(label: "Usage Dashboard", url: URL(string: "https://www.kimi.com/code/console")!)]
         case .muse: [.init(label: "Usage Dashboard", url: URL(string: "https://dev.meta.ai/usage")!)]
         case .ollama: [.init(label: "Usage Dashboard", url: URL(string: "https://ollama.com/settings")!),
                        .init(label: "API Keys", url: URL(string: "https://ollama.com/settings/keys")!)]
@@ -76,6 +79,7 @@ enum ProviderKind: String, Codable, CaseIterable, Sendable {
         case .claude, .codex, .cursor, .amp, .antigravity, .devin, .grok, .muse, .opencodeGo: [.oauth]
         case .copilot: [.oauth, .organizationToken]
         case .commandcode: [.apiKey(keyPage: URL(string: "https://commandcode.ai/studio")!)]
+        case .kimi: [.apiKey(keyPage: URL(string: "https://www.kimi.com/code/console")!)]
         case .ollama: [.apiKey(keyPage: URL(string: "https://ollama.com/settings/keys")!)]
         case .openrouter: [.apiKey(keyPage: URL(string: "https://openrouter.ai/settings/management-keys")!)]
         case .zai: [.apiKey(keyPage: URL(string: "https://z.ai/manage-apikey/apikey-list")!)]

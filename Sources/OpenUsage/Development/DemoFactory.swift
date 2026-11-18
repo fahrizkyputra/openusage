@@ -192,6 +192,7 @@ enum DemoFactory {
         case .copilot: account.organization == nil ? ["Free", "Pro", "Pro+"] : ["Business", "Enterprise"]
         case .devin: ["Core", "Team"]
         case .grok: ["SuperGrok", "SuperGrok Heavy"]
+        case .kimi: ["Adagio", "Allegretto", "Vivace"]
         case .muse: ["Free", "Pro"]
         case .ollama: ["Free", "Pro", "Max"]
         case .opencodeGo: ["Go", "Go Plus", "Go Teams"]
