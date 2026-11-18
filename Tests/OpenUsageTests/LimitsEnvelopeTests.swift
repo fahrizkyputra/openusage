@@ -300,6 +300,7 @@ final class LimitsEnvelopeTests: XCTestCase {
             "grok": ["weekly"],
             "kimi": ["session", "weekly"],
             "muse": ["session", "weekly"],
+            "ninerouterKitchen": ["session", "weekly"],
             "ollama": ["session", "weekly", "monthly", "purchasedCredits"],
             "opencode": ["session", "weekly", "monthly"],
             "openrouter": ["balance", "keyLimit"],

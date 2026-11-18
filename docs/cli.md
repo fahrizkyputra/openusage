@@ -11,7 +11,7 @@ openusage codex@1a2b3c4d   # one account, by its id
 ```
 
 - The argument is an account id (the `providers` key in the output) or a provider kind: `claude`,
-  `codex`, `commandcode`, `cursor`, `amp`, `antigravity`, `copilot`, `devin`, `grok`, `kimi`, `muse`, `ollama`, `opencode`,
+  `codex`, `commandcode`, `cursor`, `amp`, `antigravity`, `copilot`, `devin`, `grok`, `kimi`, `muse`, `ninerouterKitchen`, `ollama`, `opencode`,
   `openrouter`, `zai`. Anything else is an error.
 - `--force` from 0.7.x is accepted and does nothing. The command says so on stderr.
 
@@ -105,6 +105,7 @@ account's right-click menu.
 | Grok | `weekly` |
 | Kimi | `session`, `weekly` |
 | Muse Code | `session`, `weekly` |
+| 9router Kitchen | `session`, `weekly` |
 | Ollama | `session`, `weekly`, `monthly`, `purchasedCredits` |
 | OpenCode | `session`, `weekly`, `monthly` |
 | OpenRouter | `balance`, `keyLimit` |

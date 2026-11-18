@@ -7,6 +7,8 @@ final class AccountProviderRuntime: ProviderRuntime {
     private(set) var vault: any CredentialVault
     let http: any HTTPClient
     let now: () -> Date
+    /// Where 9router Kitchen is, from the build; nil when the build has no host.
+    let kitchenHost: URL?
     var planRead = SecondaryRead<String>()
     var planBodyRead = SecondaryRead<Data>()
     var codexResetCreditsRead = SecondaryRead<HTTPResponse>()
@@ -42,8 +44,10 @@ final class AccountProviderRuntime: ProviderRuntime {
         vault: any CredentialVault,
         http: any HTTPClient = URLSessionHTTPClient(),
         now: @escaping () -> Date = Date.init,
-        claudeSessions: ClaudeSessions = ClaudeSessions()
+        claudeSessions: ClaudeSessions = ClaudeSessions(),
+        kitchenHost: URL? = NineRouterKitchenHost.baseURL()
     ) {
+        self.kitchenHost = kitchenHost
         self.account = account
         claude = ClaudeAccountState(sessions: claudeSessions)
         self.vault = vault
@@ -90,7 +94,7 @@ final class AccountProviderRuntime: ProviderRuntime {
             items = expiries.map { ResetItem(kind: .full, expiresAt: $0, claim: .codexCredit($0)) }
         case .zai:
             items = ZAIResetsMapper.items(unexpiredZAIResets ?? [])
-        case .cursor, .amp, .antigravity, .copilot, .devin, .grok, .muse, .ollama, .opencodeGo, .openrouter, .commandcode, .kimi:
+        case .cursor, .amp, .antigravity, .copilot, .devin, .grok, .muse, .ollama, .opencodeGo, .openrouter, .commandcode, .kimi, .ninerouterKitchen:
             return nil
         }
         return ResetClaimService(accountID: account.cardID, items: items, claimReset: { [self] claim, requestID in
@@ -106,7 +110,7 @@ final class AccountProviderRuntime: ProviderRuntime {
         switch account.kind {
         case .claude: restoreClaude(snapshot)
         case .muse: museLastKnown = snapshot.lines
-        case .codex, .cursor, .amp, .antigravity, .copilot, .devin, .grok, .ollama, .opencodeGo, .openrouter, .zai, .commandcode, .kimi: break
+        case .codex, .cursor, .amp, .antigravity, .copilot, .devin, .grok, .ollama, .opencodeGo, .openrouter, .zai, .commandcode, .kimi, .ninerouterKitchen: break
         }
     }
 
@@ -161,6 +165,7 @@ final class AccountProviderRuntime: ProviderRuntime {
             case .grok: try await refreshGrok(credential)
             case .kimi: try await refreshKimi(credential)
             case .muse: try await refreshMuse(credential)
+            case .ninerouterKitchen: try await refreshNineRouterKitchen(credential)
             case .ollama: try await refreshOllama(credential)
             case .opencodeGo: try await refreshOpenCode(credential)
             case .openrouter: try await refreshOpenRouter(credential)

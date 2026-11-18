@@ -19,6 +19,7 @@ enum ProviderKind: String, Codable, CaseIterable, Sendable {
     case grok
     case kimi
     case muse
+    case ninerouterKitchen
     case ollama
     case opencodeGo = "opencode"
     case openrouter
@@ -37,6 +38,7 @@ enum ProviderKind: String, Codable, CaseIterable, Sendable {
         case .grok: "Grok"
         case .kimi: "Kimi"
         case .muse: "Muse Code"
+        case .ninerouterKitchen: "9router Kitchen"
         case .ollama: "Ollama"
         case .opencodeGo: "OpenCode"
         case .openrouter: "OpenRouter"
@@ -62,6 +64,7 @@ enum ProviderKind: String, Codable, CaseIterable, Sendable {
         case .grok: [.init(label: "Usage Dashboard", url: URL(string: "https://grok.com/?_s=usage")!)]
         case .kimi: [.init(label: "Usage Dashboard", url: URL(string: "https://www.kimi.com/code/console")!)]
         case .muse: [.init(label: "Usage Dashboard", url: URL(string: "https://dev.meta.ai/usage")!)]
+        case .ninerouterKitchen: []
         case .ollama: [.init(label: "Usage Dashboard", url: URL(string: "https://ollama.com/settings")!),
                        .init(label: "API Keys", url: URL(string: "https://ollama.com/settings/keys")!)]
         case .opencodeGo: [.init(label: "Status Page", url: URL(string: "https://status.opencode.ai/")!),
@@ -80,6 +83,8 @@ enum ProviderKind: String, Codable, CaseIterable, Sendable {
         case .copilot: [.oauth, .organizationToken]
         case .commandcode: [.apiKey(keyPage: URL(string: "https://commandcode.ai/studio")!)]
         case .kimi: [.apiKey(keyPage: URL(string: "https://www.kimi.com/code/console")!)]
+        // The key page is the team's own server, which the source does not name; the sheet's key field has no link.
+        case .ninerouterKitchen: [.apiKey(keyPage: URL(string: "https://github.com/decolua/9router")!)]
         case .ollama: [.apiKey(keyPage: URL(string: "https://ollama.com/settings/keys")!)]
         case .openrouter: [.apiKey(keyPage: URL(string: "https://openrouter.ai/settings/management-keys")!)]
         case .zai: [.apiKey(keyPage: URL(string: "https://z.ai/manage-apikey/apikey-list")!)]
@@ -100,6 +105,9 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
     /// An account mirrored from a CLIProxyAPI hub carries where its login lives there; every other
     /// account has none.
     var hub: HubLink?
+    /// A 9router Kitchen connection card carries the connection's id on the server; every other account,
+    /// including the Kitchen account that holds the API key, has none.
+    var upstream: String?
     let addedAt: Date
 
     var authMethod: ProviderAuthMethod {
@@ -112,7 +120,7 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
 
     init(
         id: UUID = UUID(), kind: ProviderKind, label: String, organization: String? = nil, domain: String? = nil,
-        hub: HubLink? = nil, addedAt: Date = Date()
+        hub: HubLink? = nil, upstream: String? = nil, addedAt: Date = Date()
     ) {
         self.id = id
         self.kind = kind
@@ -120,6 +128,7 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
         self.organization = organization
         self.domain = domain
         self.hub = hub
+        self.upstream = upstream
         self.addedAt = addedAt
     }
 }

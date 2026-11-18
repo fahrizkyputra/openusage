@@ -149,6 +149,13 @@ extension AccountProviderRuntime {
                 .percent(key: "weekly", provider: provider, title: "Weekly")
                     .exportingLimit("weekly", unit: "percent")
             ]
+        case .ninerouterKitchen:
+            [
+                .percent(key: "session", provider: provider, title: "Session")
+                    .exportingLimit("session", unit: "percent"),
+                .percent(key: "weekly", provider: provider, title: "Weekly")
+                    .exportingLimit("weekly", unit: "percent")
+            ]
         case .ollama:
             [
                 .percent(key: "session", provider: provider, title: "Session")

@@ -194,6 +194,7 @@ enum DemoFactory {
         case .grok: ["SuperGrok", "SuperGrok Heavy"]
         case .kimi: ["Adagio", "Allegretto", "Vivace"]
         case .muse: ["Free", "Pro"]
+        case .ninerouterKitchen: ["Team"]
         case .ollama: ["Free", "Pro", "Max"]
         case .opencodeGo: ["Go", "Go Plus", "Go Teams"]
         case .openrouter: ["Pay As You Go"]
