@@ -63,7 +63,8 @@ final class CommandCodeProviderTests: XCTestCase {
         let scoped = http.requests.filter { $0.url.path != "/alpha/whoami" }
         XCTAssertFalse(scoped.isEmpty)
         XCTAssertTrue(scoped.allSatisfy { $0.url.query?.contains("orgId=org_9") == true })
-        XCTAssertNil(http.requests.first { $0.url.path == "/alpha/whoami" }?.url.query?.contains("orgId"))
+        let whoami = try XCTUnwrap(http.requests.first { $0.url.path == "/alpha/whoami" })
+        XCTAssertEqual(whoami.url.query, "limits=1", "who-am-I runs before the org is known, so it carries no orgId")
     }
 
     func testARejectedKeyStopsAfterWhoamiAndNamesTheKey() async throws {
