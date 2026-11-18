@@ -152,6 +152,30 @@ final class TeamKeyImportTests: XCTestCase {
         XCTAssertEqual(store.accounts.map(\.kind), [.commandcode])
     }
 
+    func testTheKitchenTheUserLeftOnIn07StillImportsUnderItsOldId() async throws {
+        // 0.7 stored the Kitchen in its enabled list as "9router-kitchen", not as this build's kind name.
+        let home = try makeHome(["9router-kitchen.json": #"{"apiKey":"sk-k"}"#])
+        let (store, _) = makeStore()
+        let defaults = isolatedDefaults()
+        defaults.set(["claude@aaaa1111", "9router-kitchen"], forKey: "openusage.enabledProviders.v1")
+
+        _ = await run(store, home: home, defaults: defaults)
+
+        XCTAssertEqual(store.accounts.filter { $0.upstream == nil }.map(\.kind), [.ninerouterKitchen])
+    }
+
+    func testTheKitchenTheUserTurnedOffIn07StaysOff() async throws {
+        let home = try makeHome(["9router-kitchen.json": #"{"apiKey":"sk-k"}"#])
+        let (store, _) = makeStore()
+        let defaults = isolatedDefaults()
+        defaults.set(["claude@aaaa1111"], forKey: "openusage.enabledProviders.v1")
+
+        let http = await run(store, home: home, defaults: defaults)
+
+        XCTAssertTrue(store.accounts.isEmpty)
+        XCTAssertTrue(http.requests.isEmpty)
+    }
+
     func testABuildWithoutAKitchenHostImportsNoKitchenKey() async throws {
         let home = try makeHome(["9router-kitchen.json": #"{"apiKey":"sk-k"}"#])
         let (store, _) = makeStore()

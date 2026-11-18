@@ -26,7 +26,7 @@ enum TeamKeyImport {
             let doneKey = "\(importedKey).\(kind.rawValue)"
             guard !defaults.bool(forKey: doneKey) else { continue }
             guard kind != .ninerouterKitchen || kitchenHost != nil else { continue }
-            if !APIKeyV1Files.wasTurnedOff(kind, in: defaults),
+            if !wasTurnedOff(kind, in: defaults),
                !accounts.accounts.contains(where: { $0.kind == kind }),
                let key = key(at: home.appending(path: ".config/openusage/\(file)")) {
                 let runtime = AccountProviderRuntime(
@@ -54,6 +54,17 @@ enum TeamKeyImport {
             }
             defaults.set(true, forKey: doneKey)
         }
+    }
+
+    /// 0.7 listed the Kitchen as `9router-kitchen`; every other team provider kept its kind name.
+    private static func wasTurnedOff(_ kind: ProviderKind, in defaults: UserDefaults) -> Bool {
+        if APIKeyV1Files.wasTurnedOff(kind, in: defaults) == false { return false }
+        guard kind == .ninerouterKitchen else { return true }
+        let legacy = "9router-kitchen"
+        if let enabled = defaults.stringArray(forKey: "openusage.enabledProviders.v1") {
+            return !enabled.contains(legacy)
+        }
+        return defaults.stringArray(forKey: "openusage.disabledProviders.v1")?.contains(legacy) ?? false
     }
 
     /// The Kitchen's connections, as accounts, once its key is known to work. A failed read leaves the account
