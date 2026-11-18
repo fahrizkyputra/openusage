@@ -23,7 +23,12 @@ final class NineRouterSummaryCardTests: XCTestCase {
         let today = utc.startOfDay(for: Date())
         let days = (0..<30).map { offset -> String in
             let day = utc.date(byAdding: .day, value: -(29 - offset), to: today)!
-            let key = DailyUsageAccumulator.dayKey(from: day, calendar: utc)
+            let formatter = DateFormatter()
+            formatter.calendar = utc
+            formatter.timeZone = utc.timeZone
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "yyyy-MM-dd"
+            let key = formatter.string(from: day)
             return #"{"date":"\#(key)","costUSD":\#(offset),"tokens":\#(offset * 100),"requests":\#(offset)}"#
         }
         return #"{"timeZone":"UTC","days":[\#(days.joined(separator: ","))],"models":{"today":[],"last30":[]}}"#
